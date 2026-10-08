@@ -1,0 +1,77 @@
+# pragma version ~=0.4.3
+"""
+@title Spacemine Mining Project Interface
+@custom:contract-name IMining
+@license MIT
+@notice The read surface of `Mining` that the renderer and
+        integrators rely on. `Mining` declares `implements: IMining`
+        so this surface cannot drift silently.
+"""
+
+
+# @dev A resource node. The field order is part of the ABI.
+struct Node:
+    planet_id: uint256
+    kind: uint8
+    max_slots: uint8
+    occupied: uint8
+    reserve_total: uint256
+    reserve_remaining: uint256
+    emission_rate: uint256
+    total_weight: uint256
+    reward_per_weight_stored: uint256
+    last_update: uint64
+    active: bool
+
+
+# @dev A staked SCV position. The field order is part of the ABI.
+struct Position:
+    node_id: uint256
+    owner: address
+    weight: uint256
+    reward_per_weight_paid: uint256
+    accrued: uint256
+
+
+@external
+@view
+def node(node_id: uint256) -> Node:
+    """
+    @dev Returns `node_id`, projected to the current block timestamp.
+    @param node_id The 32-byte identifier of the node.
+    @return Node The node struct.
+    """
+    ...
+
+
+@external
+@view
+def position(scv_id: uint256) -> Position:
+    """
+    @dev Returns the staking position of `scv_id` (empty if unstaked).
+    @param scv_id The 32-byte identifier of the SCV.
+    @return Position The position struct.
+    """
+    ...
+
+
+@external
+@view
+def pending(scv_id: uint256) -> uint256:
+    """
+    @dev Returns the claimable rewards of `scv_id`.
+    @param scv_id The 32-byte identifier of the SCV.
+    @return uint256 The 32-byte claimable amount.
+    """
+    ...
+
+
+@external
+@view
+def is_depleted(node_id: uint256) -> bool:
+    """
+    @dev Returns whether the reserve of `node_id` is exhausted.
+    @param node_id The 32-byte identifier of the node.
+    @return bool The verification whether `node_id` is depleted.
+    """
+    ...

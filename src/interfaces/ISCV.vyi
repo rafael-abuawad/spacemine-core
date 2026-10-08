@@ -1,0 +1,79 @@
+# pragma version ~=0.4.3
+"""
+@title Spacemine SCV Project Interface
+@custom:contract-name ISCV
+@license MIT
+@notice Spacemine-specific SCV functions used cross-contract
+        (by `Mining`) and by the off-chain/Solidity renderer.
+        Standard ERC-721 calls (e.g. `ownerOf`, `transferFrom`)
+        go through the built-in `ethereum.ercs.IERC721` interface.
+"""
+
+
+# @dev Per-token on-chain properties. The field order is part
+# of the ABI (structs are encoded as tuples) and therefore
+# must not change; see `docs/RENDERER_INTERFACE.md`.
+struct SCVProperties:
+    seed: bytes32
+    revealed: bool
+    model: uint8
+    mining_power: uint16
+    mineral_efficiency_bps: uint16
+    gas_efficiency_bps: uint16
+    generation: uint16
+    born_at: uint64
+
+
+@external
+@view
+def properties(token_id: uint256) -> SCVProperties:
+    """
+    @dev Returns the properties of `token_id`.
+    @param token_id The 32-byte identifier of the token.
+    @return SCVProperties The properties struct.
+    """
+    ...
+
+
+@external
+@view
+def is_revealed(token_id: uint256) -> bool:
+    """
+    @dev Returns whether the properties of `token_id` are revealed.
+    @param token_id The 32-byte identifier of the token.
+    @return bool The verification whether `token_id` is revealed.
+    """
+    ...
+
+
+@external
+@view
+def mining_weight(token_id: uint256, kind: uint8) -> uint256:
+    """
+    @dev Returns the staking weight of `token_id` for a node of `kind`.
+    @param token_id The 32-byte identifier of the token.
+    @param kind The 1-byte resource kind (0 = mineral, 1 = gas).
+    @return uint256 The 32-byte mining weight.
+    """
+    ...
+
+
+@external
+def record_mined(token_id: uint256, kind: uint8, amount: uint256):
+    """
+    @dev Adds `amount` to the lifetime stats of `token_id`.
+    @param token_id The 32-byte identifier of the token.
+    @param kind The 1-byte resource kind (0 = mineral, 1 = gas).
+    @param amount The 32-byte amount that has been mined.
+    """
+    ...
+
+
+@external
+@view
+def mining() -> address:
+    """
+    @dev Returns the address of the wired `Mining` contract.
+    @return address The 20-byte `Mining` address.
+    """
+    ...

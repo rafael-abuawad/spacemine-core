@@ -1,0 +1,41 @@
+# pragma version ~=0.4.3
+"""
+@title Spacemine Resource Token Project Interface
+@custom:contract-name IResourceToken
+@license MIT
+@notice Non-standard functions of the MNRL/GAS tokens. All
+        standard ERC-20 calls (e.g. `transferFrom`) go through
+        the built-in `ethereum.ercs.IERC20` interface.
+"""
+
+
+@external
+def mint(owner: address, amount: uint256):
+    """
+    @dev Creates `amount` tokens and assigns them to `owner`.
+    @param owner The 20-byte owner address.
+    @param amount The 32-byte token amount to be created.
+    """
+    ...
+
+
+@external
+def burn_from(owner: address, amount: uint256):
+    """
+    @dev Destroys `amount` tokens from `owner`, deducting
+         from the caller's allowance.
+    @param owner The 20-byte owner address.
+    @param amount The 32-byte token amount to be destroyed.
+    """
+    ...
+
+
+@external
+@view
+def is_minter(minter: address) -> bool:
+    """
+    @dev Returns `True` if `minter` holds the minter role.
+    @param minter The 20-byte address to check.
+    @return bool The verification whether `minter` can mint.
+    """
+    ...

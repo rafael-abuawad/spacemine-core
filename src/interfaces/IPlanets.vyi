@@ -1,0 +1,64 @@
+# pragma version ~=0.4.3
+"""
+@title Spacemine Planets Project Interface
+@custom:contract-name IPlanets
+@license MIT
+@notice Spacemine-specific Planets functions used cross-contract
+        (by `Mining`) and by the renderer.
+"""
+
+
+# @dev Planet properties. The field order is part of the
+# ABI and therefore must not change.
+struct Planet:
+    name: String[32]
+    seed: bytes32
+    biome: uint8
+    size: uint8
+    coord_x: int32
+    coord_y: int32
+    mineral_richness_bps: uint16
+    gas_richness_bps: uint16
+    created_at: uint64
+
+
+@external
+@view
+def planet(planet_id: uint256) -> Planet:
+    """
+    @dev Returns the properties of `planet_id`.
+    @param planet_id The 32-byte identifier of the planet.
+    @return Planet The planet struct.
+    """
+    ...
+
+
+@external
+@view
+def nodes_of(planet_id: uint256) -> DynArray[uint256, 16]:
+    """
+    @dev Returns the resource node IDs registered on `planet_id`.
+    @param planet_id The 32-byte identifier of the planet.
+    @return DynArray The node IDs.
+    """
+    ...
+
+
+@external
+def register_node(planet_id: uint256, node_id: uint256):
+    """
+    @dev Appends `node_id` to the registry of `planet_id`.
+    @param planet_id The 32-byte identifier of the planet.
+    @param node_id The 32-byte identifier of the node.
+    """
+    ...
+
+
+@external
+@view
+def mining() -> address:
+    """
+    @dev Returns the address of the wired `Mining` contract.
+    @return address The 20-byte `Mining` address.
+    """
+    ...

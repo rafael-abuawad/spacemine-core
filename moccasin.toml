@@ -1,0 +1,38 @@
+[project]
+src = "src"
+out = "out"
+dot_env = ".env"
+dependencies = ["snekmate"]
+
+[networks.pyevm]
+is_zksync = false
+
+[networks.anvil]
+url = "http://127.0.0.1:8545"
+prompt_live = false
+save_to_db = false
+chain_id = 31337
+
+[networks.sepolia]
+url = "https://ethereum-sepolia-rpc.publicnode.com"
+chain_id = 11155111
+
+[networks.zksync-sepolia]
+url = "https://sepolia.era.zksync.dev"
+chain_id = 300
+is_zksync = true
+prompt_live = true
+
+# Spacemine production target. The chain has not been decided yet.
+# TODO_CHAIN_ID: set `url` and `chain_id` once the launchpad chain for CREDITS is known.
+# TODO_CHAIN_ID: confirm EIP-2935 (historical block hashes) is live on that chain; SCV
+#                reveals fall back to baseline stats after 256 blocks otherwise.
+# TODO_CHAIN_ID: set CREDITS_ADDRESS (and TREASURY_ADDRESS) in `.env` before deploying.
+[networks.spacemine-target]
+url = "https://TODO_CHAIN_RPC_URL"
+chain_id = 0 # TODO_CHAIN_ID
+prompt_live = true
+save_to_db = true
+explorer_type = "blockscout" # TODO_CHAIN_ID: or "etherscan"
+
+# You can view all configuration options at https://cyfrin.github.io/moccasin/all_moccasin_toml_parameters.html

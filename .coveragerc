@@ -1,0 +1,6 @@
+[run]
+plugins = boa.coverage
+
+[report]
+include = src/*
+show_missing = True
