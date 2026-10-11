@@ -1,7 +1,7 @@
 import boa
 
 from helpers import E18, ZERO_ADDRESS, event_names
-from src import ResourceToken
+from src import resource_token as ResourceToken
 
 
 def test_metadata(minerals, gas):

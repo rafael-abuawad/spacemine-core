@@ -12,6 +12,7 @@ from helpers import (
     KIND_MINERAL,
     SCV_BASE,
     SCV_PRICE,
+    STANDARD,
     ZERO_ADDRESS,
     block_number,
     buy_and_reveal,
@@ -22,8 +23,9 @@ from helpers import (
     fund_credits,
     load_mock,
     log_args,
+    set_block_hash,
 )
-from src import SCV
+from src import scv as SCV
 
 
 def deploy_scv(credits, treasury, burn=False, price=SCV_PRICE, max_supply=100):
@@ -172,7 +174,7 @@ def test_buy_supply_cap(world, credits, alice, deployer):
 
 
 def test_buy_fee_on_transfer_credits_reverts(alice, deployer):
-    fee_credits = load_mock("MockFeeCredits", 100)  # 1% fee
+    fee_credits = load_mock("mock_fee_credits", 100)  # 1% fee
     contract = deploy_scv(fee_credits, deployer)
     fee_credits.mint(alice, 10 * SCV_PRICE)
     fee_credits.approve(contract.address, 10 * SCV_PRICE, sender=alice)
@@ -182,7 +184,7 @@ def test_buy_fee_on_transfer_credits_reverts(alice, deployer):
 
 
 def test_buy_fee_on_transfer_with_zero_fee_succeeds(alice, deployer):
-    fee_credits = load_mock("MockFeeCredits", 0)
+    fee_credits = load_mock("mock_fee_credits", 0)
     contract = deploy_scv(fee_credits, deployer)
     fee_credits.mint(alice, SCV_PRICE)
     fee_credits.approve(contract.address, SCV_PRICE, sender=alice)
@@ -191,7 +193,7 @@ def test_buy_fee_on_transfer_with_zero_fee_succeeds(alice, deployer):
 
 
 def test_buy_credits_returning_false_reverts(alice, deployer):
-    fee_credits = load_mock("MockFeeCredits", 0)
+    fee_credits = load_mock("mock_fee_credits", 0)
     fee_credits.set_return_false(True)
     contract = deploy_scv(fee_credits, deployer)
     fee_credits.mint(alice, SCV_PRICE)
@@ -201,7 +203,7 @@ def test_buy_credits_returning_false_reverts(alice, deployer):
 
 
 def test_buy_no_return_credits(alice, deployer):
-    no_return = load_mock("MockNoReturnCredits")
+    no_return = load_mock("mock_no_return_credits")
     contract = deploy_scv(no_return, deployer)
     no_return.mint(alice, 2 * SCV_PRICE)
     no_return.approve(contract.address, 2 * SCV_PRICE, sender=alice)
@@ -228,7 +230,7 @@ def test_buy_rejects_eth(world, scv, alice):
 
 
 def test_buy_by_contract_does_not_need_receiver_hook(world, scv, credits):
-    caller = load_mock("MockCaller")
+    caller = load_mock("mock_caller")
     credits.mint(caller.address, SCV_PRICE)
     caller.execute(credits.address, credits.approve.prepare_calldata(scv.address, SCV_PRICE))
     caller.execute(scv.address, scv.buy.prepare_calldata(1, SCV_PRICE))
@@ -285,13 +287,12 @@ def test_reveal_after_window(world, scv, alice, bob):
     assert all(not log.baseline for log in revealed_logs)
 
 
-def test_reveal_seed_formula_with_eip2935_history(world, scv, alice):
+def test_reveal_seed_formula_with_native_blockhash(world, scv, alice):
     (token_id,) = buy_scvs(world, alice, 1)
     commit = scv.reveal_block(token_id)
-    boa.env.time_travel(blocks=300)  # beyond the native 256-block window
+    boa.env.time_travel(blocks=100)
     block_hash = keccak(b"spacemine-test-hash")
-    boa.env.set_code(HISTORY_ADDRESS, HISTORY_CODE)
-    boa.env.set_storage(HISTORY_ADDRESS, commit % 8191, int.from_bytes(block_hash, "big"))
+    set_block_hash(commit, block_hash)
     scv.reveal([token_id])
     props = scv.properties(token_id)
     expected_seed = keccak(encode(["bytes32", "uint256", "address"], [block_hash, token_id, scv.address]))
@@ -299,6 +300,33 @@ def test_reveal_seed_formula_with_eip2935_history(world, scv, alice):
     assert (props.model, props.mining_power, props.mineral_efficiency_bps, props.gas_efficiency_bps) == expected_roll(
         expected_seed
     )
+
+
+def test_reveal_window_boundary(world, scv, alice):
+    ids = buy_scvs(world, alice, 2)
+    commit = scv.reveal_block(ids[0])
+    assert scv.BLOCKHASH_WINDOW() == 256
+    boa.env.time_travel(blocks=commit + 256 - block_number())  # exactly 256 blocks after commit
+    set_block_hash(commit, keccak(b"edge"))
+    scv.reveal(ids[:1])
+    assert scv.properties(ids[0]).seed != b"\x00" * 32
+    boa.env.time_travel(blocks=1)  # 257 blocks: outside the window
+    scv.reveal(ids[1:])
+    assert scv.properties(ids[1]).seed == b"\x00" * 32
+
+
+def test_reveal_ignores_eip2935_history(world, scv, alice):
+    # On Arbitrum Orbit chains the history contract is indexed by L2 block numbers while
+    # `block.number` is the parent-chain estimate, so `scv` must never consult it.
+    (token_id,) = buy_scvs(world, alice, 1)
+    commit = scv.reveal_block(token_id)
+    boa.env.time_travel(blocks=300)
+    boa.env.set_code(HISTORY_ADDRESS, HISTORY_CODE)
+    boa.env.set_storage(HISTORY_ADDRESS, commit % 8191, int.from_bytes(keccak(b"history"), "big"))
+    scv.reveal([token_id])
+    props = scv.properties(token_id)
+    assert props.seed == b"\x00" * 32
+    assert (props.model, props.mining_power) == (STANDARD, 100)
 
 
 def test_reveal_expired_blockhash_fallback(world, scv, alice):
@@ -310,7 +338,7 @@ def test_reveal_expired_blockhash_fallback(world, scv, alice):
         props = scv.properties(token_id)
         assert props.revealed is True
         assert props.seed == b"\x00" * 32
-        assert (props.model, props.mining_power) == (0, 100)
+        assert (props.model, props.mining_power) == (STANDARD, 100)
         assert (props.mineral_efficiency_bps, props.gas_efficiency_bps) == (5_000, 5_000)
         assert scv.mining_weight(token_id, KIND_MINERAL) == 50
     assert len(revealed_logs) == 2
@@ -338,7 +366,7 @@ def test_reveal_nonexistent_token(scv):
 
 
 def test_malicious_buyer_cannot_select_rolls(world, scv, credits):
-    gambler = load_mock("MockGambler")
+    gambler = load_mock("mock_gambler")
     credits.mint(gambler.address, 10 * SCV_PRICE)
     gambler.approve(credits.address, scv.address, 10 * SCV_PRICE)
 
@@ -364,8 +392,9 @@ def test_mining_weight(world, scv, alice):
     props = scv.properties(token_id)
     assert scv.mining_weight(token_id, KIND_MINERAL) == props.mining_power * props.mineral_efficiency_bps // 10_000
     assert scv.mining_weight(token_id, KIND_GAS) == props.mining_power * props.gas_efficiency_bps // 10_000
-    with boa.reverts("scv: invalid kind"):
-        scv.mining_weight(token_id, 2)
+    for kind in (0, KIND_MINERAL | KIND_GAS):  # empty flag, two members
+        with boa.reverts("scv: invalid kind"):
+            scv.mining_weight(token_id, kind)
 
 
 def test_mining_weight_unrevealed_or_missing(world, scv, alice):
@@ -399,7 +428,7 @@ def test_record_mined_only_mining(world, scv, alice):
     assert scv.lifetime_gas(token_id) == 3
 
     with boa.reverts("scv: invalid kind"):
-        scv.record_mined(token_id, 2, 1, sender=mining)
+        scv.record_mined(token_id, KIND_MINERAL | KIND_GAS, 1, sender=mining)
     with boa.reverts("erc721: invalid token ID"):
         scv.record_mined(999, KIND_MINERAL, 1, sender=mining)
 

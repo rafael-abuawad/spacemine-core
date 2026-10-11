@@ -1,7 +1,7 @@
 # pragma version ~=0.4.3
 """
 @title Mock No-Return CREDITS
-@custom:contract-name MockNoReturnCredits
+@custom:contract-name mock_no_return_credits
 @license MIT
 @notice Test-only ERC-20 whose `transfer` and `transferFrom`
         return nothing (like legacy USDT).

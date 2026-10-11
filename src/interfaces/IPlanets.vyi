@@ -8,12 +8,23 @@
 """
 
 
+# @dev Planet biomes (TERRAN = 1, DESERT = 2, ICE = 4, VOLCANIC = 8,
+# ASH = 16, JUNGLE = 32). Exactly one member is set per planet.
+flag Biome:
+    TERRAN
+    DESERT
+    ICE
+    VOLCANIC
+    ASH
+    JUNGLE
+
+
 # @dev Planet properties. The field order is part of the
 # ABI and therefore must not change.
 struct Planet:
     name: String[32]
     seed: bytes32
-    biome: uint8
+    biome: Biome
     size: uint8
     coord_x: int32
     coord_y: int32

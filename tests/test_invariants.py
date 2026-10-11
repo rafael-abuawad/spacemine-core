@@ -6,7 +6,7 @@ from hypothesis import HealthCheck, settings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, rule, run_state_machine_as_test
 
-from helpers import KIND_GAS, KIND_MINERAL
+from helpers import KIND_GAS, KIND_MINERAL, TERRAN
 from script.deploy import deploy
 
 N_USERS = 3
@@ -24,7 +24,7 @@ def base():
     """Deployed once, outside the per-test isolation; every example runs inside its own anchor."""
     d = deploy(seed_demo=False)
     d.scv.set_sale_active(True)
-    planet = d.planets.create_planet("Invariant", 0, 5, 0, 0, 10_000, 10_000)
+    planet = d.planets.create_planet("Invariant", TERRAN, 5, 0, 0, 10_000, 10_000)
     nodes = [d.mining.create_node(planet, *spec) for spec in NODE_SPECS]
     users = [boa.env.generate_address(f"user{i}") for i in range(N_USERS)]
     owned = {}

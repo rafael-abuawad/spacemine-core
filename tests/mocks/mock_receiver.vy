@@ -1,7 +1,7 @@
 # pragma version ~=0.4.3
 """
 @title Mock ERC-721/ERC-1155 Receiver
-@custom:contract-name MockReceiver
+@custom:contract-name mock_receiver
 @license MIT
 @notice Test-only token receiver. Depending on `mode`, the hooks
         accept (0), revert (1), attempt a re-entrant call with

@@ -2,7 +2,7 @@
 # pragma nonreentrancy off
 """
 @title Mock Fee-On-Transfer CREDITS
-@custom:contract-name MockFeeCredits
+@custom:contract-name mock_fee_credits
 @license MIT
 @notice Test-only ERC-20 that burns `fee_bps` of every
         `transferFrom`. If `return_false` is set, `transferFrom`

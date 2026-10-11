@@ -1,7 +1,7 @@
 # pragma version ~=0.4.3
 """
 @title Mock Caller (Non-Receiver Contract)
-@custom:contract-name MockCaller
+@custom:contract-name mock_caller
 @license MIT
 @notice Test-only contract that forwards arbitrary calls and
         implements no token receiver hooks.

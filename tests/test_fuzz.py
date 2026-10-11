@@ -1,7 +1,8 @@
 """Property-based tests over amounts, weights, and time deltas.
 
-Weights are fuzzed through the real reveal path: a fuzzed block hash is planted in the
-EIP-2935 history contract, so every SCV gets fuzzed (but protocol-valid) properties.
+Weights are fuzzed through the real reveal path: a fuzzed block hash is planted as the
+native `blockhash` of the commit block, so every SCV gets fuzzed (but protocol-valid)
+properties.
 """
 
 import boa
@@ -12,14 +13,15 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from helpers import (
-    HISTORY_ADDRESS,
-    HISTORY_CODE,
+    FREIGHTER,
     KIND_GAS,
     KIND_MINERAL,
+    TERRAN,
     NodeModel,
     expected_roll,
     give_resources,
     now,
+    set_block_hash,
 )
 from script.deploy import deploy
 
@@ -31,7 +33,7 @@ HASHES = st.binary(min_size=32, max_size=32).filter(lambda b: b != bytes(32))
 def base():
     d = deploy(seed_demo=False)
     d.scv.set_sale_active(True)
-    planet = d.planets.create_planet("Fuzzworld", 0, 5, 0, 0, 10_000, 10_000)
+    planet = d.planets.create_planet("Fuzzworld", TERRAN, 5, 0, 0, 10_000, 10_000)
     return d, planet
 
 
@@ -42,9 +44,8 @@ def buy_with_hash(d, user, quantity: int, block_hash: bytes) -> list[int]:
     first = d.scv.buy(quantity, cost, sender=user)
     ids = list(range(first, first + quantity))
     commit = d.scv.reveal_block(first)
-    boa.env.time_travel(blocks=300)
-    boa.env.set_code(HISTORY_ADDRESS, HISTORY_CODE)
-    boa.env.set_storage(HISTORY_ADDRESS, commit % 8191, int.from_bytes(block_hash, "big"))
+    boa.env.time_travel(blocks=10)
+    set_block_hash(commit, block_hash)
     d.scv.reveal(ids)
     return ids
 
@@ -63,7 +64,7 @@ def test_fuzz_reveal_roll(base, block_hash, quantity):
             assert (props.model, props.mining_power, props.mineral_efficiency_bps, props.gas_efficiency_bps) == (
                 expected_roll(seed)
             )
-            assert 0 <= props.model <= 3
+            assert props.model in (1, 2, 4, 8)
             assert 100 <= props.mining_power <= 400
             assert 5_000 <= props.mineral_efficiency_bps <= 15_000
             assert 5_000 <= props.gas_efficiency_bps <= 15_000
@@ -182,7 +183,7 @@ def test_fuzz_spaceship_buy(base, mineral_cost, gas_cost, amount, extra):
     d, _ = base
     with boa.env.anchor():
         user = boa.env.generate_address()
-        ship = d.spaceships.create_ship_type("Fuzz", 2, mineral_cost, gas_cost, 0, 1, 1, 1, 1, 1)
+        ship = d.spaceships.create_ship_type("Fuzz", FREIGHTER, mineral_cost, gas_cost, 0, 1, 1, 1, 1, 1)
         total_m, total_g = mineral_cost * amount, gas_cost * amount
         give_resources(d, user, minerals=total_m + extra, gas=total_g + extra)
         if total_m:

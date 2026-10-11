@@ -39,7 +39,7 @@ def test_demo_seed():
 
 
 def test_env_configuration(monkeypatch, alice):
-    existing = load_mock("MockCredits")
+    existing = load_mock("mock_credits")
     monkeypatch.setenv("CREDITS_ADDRESS", str(existing.address))
     monkeypatch.setenv("TREASURY_ADDRESS", str(alice))
     monkeypatch.setenv("SCV_BURN_PROCEEDS", "1")

@@ -42,14 +42,14 @@ Notes:
 
 ## 2. View calls by collection
 
-### `ISCV` (`src/SCV.vy`, ERC-721)
+### `ISCV` (`src/scv.vy`, ERC-721)
 
 | Call | Returns | Notes |
 |---|---|---|
 | `properties(uint256)` | `SCVProperties` tuple | reverts if the token doesn't exist |
 | `is_revealed(uint256)` | `bool` | `false` for non-existent tokens |
 | `reveal_block(uint256)` | `uint256` | commit block; reveal is possible once `block.number > reveal_block` |
-| `mining_weight(uint256 id, uint8 kind)` | `uint256` | `mining_power * efficiency_bps(kind) / 10_000`; reverts if unrevealed |
+| `mining_weight(uint256 id, uint256 kind)` | `uint256` | `mining_power * efficiency_bps(kind) / 10_000`; reverts if unrevealed |
 | `lifetime_minerals(uint256)` / `lifetime_gas(uint256)` | `uint256` | resource wei mined, all-time |
 | `ownerOf(uint256)` | `address` | equals the Mining address while staked |
 | `totalSupply()` / `total_minted()` / `max_supply()` | `uint256` | there is no burn, so `totalSupply == total_minted` |
@@ -58,7 +58,7 @@ Notes:
 struct SCVProperties {      // ABI tuple order, do not reorder
     bytes32 seed;           // keccak256(abi.encode(blockhash(reveal_block), tokenId, scv)); 0x0 = baseline reveal
     bool    revealed;
-    uint8   model;          // rarity tier, see enums
+    uint256 model;          // `Tier` flag, see section 4 (0 before reveal)
     uint16  mining_power;   // 100..400
     uint16  mineral_efficiency_bps; // 5_000..15_000
     uint16  gas_efficiency_bps;     // 5_000..15_000
@@ -70,7 +70,7 @@ struct SCVProperties {      // ABI tuple order, do not reorder
 Before reveal, only `generation` and `born_at` are set; everything else is zero. Render these
 tokens as "unrevealed".
 
-### `IPlanets` (`src/Planets.vy`, soulbound ERC-721 / ERC-5192)
+### `IPlanets` (`src/planets.vy`, soulbound ERC-721 / ERC-5192)
 
 | Call | Returns | Notes |
 |---|---|---|
@@ -84,7 +84,7 @@ tokens as "unrevealed".
 struct Planet {
     string  name;                 // max 32 chars
     bytes32 seed;                 // cosmetic, deterministic
-    uint8   biome;                // see enums
+    uint256 biome;                // `Biome` flag, see section 4
     uint8   size;                 // 1..10
     int32   coord_x;
     int32   coord_y;
@@ -94,7 +94,7 @@ struct Planet {
 }
 ```
 
-### `IMining` (`src/Mining.vy`)
+### `IMining` (`src/mining.vy`)
 
 | Call | Returns | Notes |
 |---|---|---|
@@ -111,7 +111,7 @@ struct Planet {
 ```solidity
 struct Node {
     uint256 planet_id;
-    uint8   kind;                   // 0 mineral patch, 1 gas geyser
+    uint256 kind;                   // `ResourceKind` flag: 1 mineral patch, 2 gas geyser
     uint8   max_slots;              // 1..8
     uint8   occupied;
     uint256 reserve_total;          // resource wei, already scaled by planet richness
@@ -132,7 +132,7 @@ struct Position {
 }
 ```
 
-### `ISpaceships` (`src/Spaceships.vy`, ERC-1155)
+### `ISpaceships` (`src/spaceships.vy`, ERC-1155)
 
 | Call | Returns | Notes |
 |---|---|---|
@@ -146,7 +146,7 @@ struct Position {
 ```solidity
 struct ShipType {
     string  name;          // max 32 chars
-    uint8   ship_class;    // see enums (`class` is a reserved word in Vyper)
+    uint256 ship_class;    // `ShipClass` flag, see section 4 (`class` is reserved in Vyper)
     uint256 mineral_cost;  // MNRL wei per ship (mutable by owner)
     uint256 gas_cost;      // GAS wei per ship (mutable by owner)
     uint256 max_supply;    // 0 = unlimited; can only decrease
@@ -176,26 +176,31 @@ struct ShipType {
 Time-dependent values (`pending`, `reserve_remaining`, `time_to_depletion`) change every second
 without an event, so render them at read time and don't cache them.
 
-## 4. Enum values
+## 4. Flag values
 
-**SCV `model` (rarity tier)**
+The Vyper contracts use [`flag`](https://docs.vyperlang.org/en/stable/types.html#flags) types.
+A flag is ABI-encoded as a `uint256` bitmask in which member `n` has the value `2**n`.
+Every flag field holds **exactly one** member; the contracts reject the empty value and
+combinations of members on input. Decode with `value == 1 << n`, not `value == n`.
 
-| Value | Name | Probability | `mining_power` |
+**SCV `model`** (`ISCV.Tier`; `0` means "not revealed yet")
+
+| Value | Member | Probability | `mining_power` |
 |---|---|---|---|
-| 0 | Standard | 60% | 100–149 |
-| 1 | Advanced | 25% | 150–219 |
-| 2 | Elite | 12% | 220–299 |
-| 3 | Prototype | 3% | 300–400 |
+| 1 | `STANDARD` | 60% | 100–149 |
+| 2 | `ADVANCED` | 25% | 150–219 |
+| 4 | `ELITE` | 12% | 220–299 |
+| 8 | `PROTOTYPE` | 3% | 300–400 |
 
 Efficiencies are uniform in 5,000–15,000 bps and independent of the tier. **Baseline reveal**
-(the committed block hash had expired): `seed = 0x0`, `model = 0`, `mining_power = 100`, both
+(the reveal came more than 256 blocks after the commit block): `seed = 0x0`, `model = 1` (`STANDARD`), `mining_power = 100`, both
 efficiencies `5,000`. This is the worst possible roll, so you may want to render it as
 "Salvaged" or similar.
 
-**Planet `biome`**: 0 Terran, 1 Desert, 2 Ice, 3 Volcanic, 4 Ash, 5 Jungle.
+**Planet `biome`** (`IPlanets.Biome`): 1 `TERRAN`, 2 `DESERT`, 4 `ICE`, 8 `VOLCANIC`, 16 `ASH`, 32 `JUNGLE`.
 
-**Node `kind`**: 0 Mineral patch (pays MNRL), 1 Gas geyser (pays GAS).
+**Node `kind`** (`ISCV.ResourceKind`): 1 `MINERAL` (patch, pays MNRL), 2 `GAS` (geyser, pays GAS).
 
-**Ship `ship_class`**: 0 Fighter, 1 Frigate, 2 Freighter, 3 Cruiser, 4 Carrier.
+**Ship `ship_class`** (`spaceships.ShipClass`): 1 `FIGHTER`, 2 `FRIGATE`, 4 `FREIGHTER`, 8 `CRUISER`, 16 `CARRIER`.
 
 **Resource amounts**: MNRL and GAS have 18 decimals; all costs, reserves, rates and rewards are in wei.

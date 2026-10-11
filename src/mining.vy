@@ -2,7 +2,7 @@
 # pragma nonreentrancy off
 """
 @title Spacemine Mining (Resource Nodes + Unipool-Style Staking)
-@custom:contract-name Mining
+@custom:contract-name mining
 @license MIT
 @notice Holds every resource node (mineral patch or gas geyser) and
         lets SCV holders stake revealed SCVs into them. Each node
@@ -66,11 +66,6 @@ exports: (
     ownable_2step.renounce_ownership,
     pausable.paused,
 )
-
-
-# @dev Resource kinds.
-KIND_MINERAL: public(constant(uint8)) = 0
-KIND_GAS: public(constant(uint8)) = 1
 
 
 # @dev The maximum number of SCV slots per node.
@@ -153,7 +148,7 @@ _staked_by_index: HashMap[uint256, uint256]
 event NodeCreated:
     node_id: indexed(uint256)
     planet_id: indexed(uint256)
-    kind: uint8
+    kind: ISCV.ResourceKind
     max_slots: uint8
     reserve_total: uint256
     emission_rate: uint256
@@ -223,7 +218,7 @@ def __init__(scv_: address, planets_: address, minerals_: address, gas_: address
 @external
 @nonreentrant
 def create_node(
-    planet_id: uint256, kind: uint8, max_slots: uint8, base_reserve: uint256, base_rate: uint256
+    planet_id: uint256, kind: ISCV.ResourceKind, max_slots: uint8, base_reserve: uint256, base_rate: uint256
 ) -> uint256:
     """
     @dev Creates a resource node on `planet_id` and registers it there.
@@ -232,7 +227,7 @@ def create_node(
             `reserve = base_reserve * richness_bps / 10_000`.
             Reserve and rate are immutable after creation.
     @param planet_id The 32-byte identifier of the planet.
-    @param kind The 1-byte resource kind (0 = mineral, 1 = gas).
+    @param kind The `ISCV.ResourceKind` (exactly one member).
     @param max_slots The 1-byte number of SCV slots (1..`MAX_SLOTS`).
     @param base_reserve The 32-byte unscaled reserve (1..`MAX_BASE_RESERVE`).
     @param base_rate The 32-byte emission rate in resource wei per
@@ -240,14 +235,14 @@ def create_node(
     @return uint256 The 32-byte ID of the new node.
     """
     ownable._check_owner()
-    assert kind <= KIND_GAS, "mining: invalid kind"
+    assert kind == ISCV.ResourceKind.MINERAL or kind == ISCV.ResourceKind.GAS, "mining: invalid kind"
     assert max_slots != empty(uint8) and convert(max_slots, uint256) <= MAX_SLOTS, "mining: invalid slots"
     assert base_reserve != empty(uint256) and base_reserve <= MAX_BASE_RESERVE, "mining: invalid reserve"
     assert base_rate != empty(uint256) and base_rate <= MAX_EMISSION_RATE, "mining: invalid rate"
 
     world: IPlanets.Planet = staticcall IPlanets(planets).planet(planet_id)
     richness: uint16 = world.mineral_richness_bps
-    if kind == KIND_GAS:
+    if kind == ISCV.ResourceKind.GAS:
         richness = world.gas_richness_bps
     reserve: uint256 = base_reserve * convert(richness, uint256) // _BPS
     assert reserve != empty(uint256), "mining: zero reserve"
@@ -607,7 +602,8 @@ def _collect(scv_ids: DynArray[uint256, MAX_BATCH], release: bool):
     assert len(scv_ids) != empty(uint256), "mining: empty batch"
     mineral_total: uint256 = empty(uint256)
     gas_total: uint256 = empty(uint256)
-    kinds: DynArray[uint8, MAX_BATCH] = []
+    # Vyper has no arrays of flags, so the kind is kept as a Boolean.
+    is_gas: DynArray[bool, MAX_BATCH] = []
     rewards: DynArray[uint256, MAX_BATCH] = []
 
     for scv_id: uint256 in scv_ids:
@@ -619,11 +615,11 @@ def _collect(scv_ids: DynArray[uint256, MAX_BATCH], release: bool):
         earned: uint256 = node.reward_per_weight_stored - pos.reward_per_weight_paid
         reward: uint256 = pos.accrued + pos.weight * earned // PRECISION
         self.paid_out[pos.node_id] += reward
-        if node.kind == KIND_MINERAL:
-            mineral_total += reward
-        else:
+        if node.kind == ISCV.ResourceKind.GAS:
             gas_total += reward
-        kinds.append(node.kind)
+        else:
+            mineral_total += reward
+        is_gas.append(node.kind == ISCV.ResourceKind.GAS)
         rewards.append(reward)
 
         if release:
@@ -643,7 +639,10 @@ def _collect(scv_ids: DynArray[uint256, MAX_BATCH], release: bool):
     idx: uint256 = empty(uint256)
     for scv_id: uint256 in scv_ids:
         if rewards[idx] != empty(uint256):
-            extcall ISCV(scv).record_mined(scv_id, kinds[idx], rewards[idx])
+            kind: ISCV.ResourceKind = ISCV.ResourceKind.MINERAL
+            if is_gas[idx]:
+                kind = ISCV.ResourceKind.GAS
+            extcall ISCV(scv).record_mined(scv_id, kind, rewards[idx])
         if release:
             extcall IERC721(scv).transferFrom(self, msg.sender, scv_id)
         idx = unsafe_add(idx, 1)

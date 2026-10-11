@@ -1,11 +1,11 @@
 import boa
 import pytest
 
-from helpers import ZERO_ADDRESS, event_names, events, log_args
-from src import Planets
+from helpers import ASH, DESERT, JUNGLE, TERRAN, ZERO_ADDRESS, event_names, events, log_args
+from src import planets as Planets
 
 
-def create(planets, sender, name="Aiur", biome=1, size=4, x=-10, y=25, mineral=11_000, gas=9_000):
+def create(planets, sender, name="Aiur", biome=DESERT, size=4, x=-10, y=25, mineral=11_000, gas=9_000):
     return planets.create_planet(name, biome, size, x, y, mineral, gas, sender=sender)
 
 
@@ -31,7 +31,7 @@ def test_create_planet_mints_to_self(planets, deployer):
     assert logs == ["Transfer", "Locked", "PlanetCreated"]
 
     p = planets.planet(1)
-    assert (p.name, p.biome, p.size, p.coord_x, p.coord_y) == ("Aiur", 1, 4, -10, 25)
+    assert (p.name, p.biome, p.size, p.coord_x, p.coord_y) == ("Aiur", DESERT, 4, -10, 25)
     assert (p.mineral_richness_bps, p.gas_richness_bps) == (11_000, 9_000)
     assert p.created_at == boa.env.evm.patch.timestamp
     assert p.seed != b"\x00" * 32
@@ -43,7 +43,8 @@ def test_create_planet_mints_to_self(planets, deployer):
     "kwargs,message",
     [
         ({"name": ""}, "planets: empty name"),
-        ({"biome": 6}, "planets: invalid biome"),
+        ({"biome": 0}, "planets: invalid biome"),  # empty flag
+        ({"biome": TERRAN | ASH}, "planets: invalid biome"),  # two biomes
         ({"size": 0}, "planets: invalid size"),
         ({"size": 11}, "planets: invalid size"),
         ({"mineral": 30_001}, "planets: invalid richness"),
@@ -56,8 +57,8 @@ def test_create_planet_validation(planets, deployer, kwargs, message):
 
 
 def test_create_planet_bounds_accepted(planets, deployer):
-    create(planets, deployer, biome=5, size=10, mineral=30_000, gas=0, x=-(2**31), y=2**31 - 1)
-    create(planets, deployer, biome=0, size=1, mineral=0, gas=30_000)
+    create(planets, deployer, biome=JUNGLE, size=10, mineral=30_000, gas=0, x=-(2**31), y=2**31 - 1)
+    create(planets, deployer, biome=TERRAN, size=1, mineral=0, gas=30_000)
     assert planets.planet_count() == 2
 
 

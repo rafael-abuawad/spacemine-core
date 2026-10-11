@@ -2,7 +2,7 @@
 # pragma nonreentrancy off
 """
 @title Spacemine Spaceships Collection
-@custom:contract-name Spaceships
+@custom:contract-name spaceships
 @license MIT
 @notice ERC-1155 collection where every token ID is a ship type.
         Ships of the same type are fungible, so on-chain properties
@@ -102,9 +102,14 @@ _SUPPORTED_INTERFACES: constant(bytes4[4]) = [
 ]
 
 
-# @dev Ship classes: 0 = Fighter, 1 = Frigate, 2 = Freighter,
-# 3 = Cruiser, 4 = Carrier.
-CLASS_COUNT: public(constant(uint8)) = 5
+# @dev Ship classes (FIGHTER = 1, FRIGATE = 2, FREIGHTER = 4,
+# CRUISER = 8, CARRIER = 16). Exactly one member is set per type.
+flag ShipClass:
+    FIGHTER
+    FRIGATE
+    FREIGHTER
+    CRUISER
+    CARRIER
 
 
 # @dev The maximum number of ships per type in one purchase.
@@ -122,7 +127,7 @@ MAX_SHIP_TYPES: public(constant(uint256)) = 64
 # @dev Ship type properties. The field order is part of the ABI.
 struct ShipType:
     name: String[32]
-    ship_class: uint8
+    ship_class: ShipClass
     mineral_cost: uint256
     gas_cost: uint256
     max_supply: uint256
@@ -165,7 +170,7 @@ _ship_types: HashMap[uint256, ShipType]
 event ShipTypeCreated:
     ship_id: indexed(uint256)
     name: String[32]
-    ship_class: uint8
+    ship_class: ShipClass
     mineral_cost: uint256
     gas_cost: uint256
     max_supply: uint256
@@ -311,7 +316,7 @@ def quote(ship_id: uint256, amount: uint256) -> (uint256, uint256):
 @nonreentrant
 def create_ship_type(
     name: String[32],
-    ship_class: uint8,
+    ship_class: ShipClass,
     mineral_cost: uint256,
     gas_cost: uint256,
     max_supply: uint256,
@@ -328,7 +333,7 @@ def create_ship_type(
             (downwards only) `max_supply` can be changed later.
             Emits `ShipTypeCreated` and the ERC-1155 `URI` event.
     @param name The maximum 32-character non-empty name.
-    @param ship_class The 1-byte class (0..`CLASS_COUNT` - 1).
+    @param ship_class The `ShipClass` (exactly one member).
     @param mineral_cost The 32-byte MNRL cost per ship.
     @param gas_cost The 32-byte GAS cost per ship. At least one
            of the two costs must be non-zero.
@@ -342,7 +347,10 @@ def create_ship_type(
     """
     ownable._check_owner()
     assert len(name) != empty(uint256), "spaceships: empty name"
-    assert ship_class < CLASS_COUNT, "spaceships: invalid class"
+    # Out-of-range flag values are rejected by the ABI decoder; this
+    # rejects the empty flag and combinations of several classes.
+    class_bits: uint256 = convert(ship_class, uint256)
+    assert class_bits != empty(uint256) and class_bits & (class_bits - 1) == empty(uint256), "spaceships: invalid class"
     assert mineral_cost != empty(uint256) or gas_cost != empty(uint256), "spaceships: free ship"
     ship_id: uint256 = self.ship_type_count + 1
     assert ship_id <= MAX_SHIP_TYPES, "spaceships: too many ship types"

@@ -2,7 +2,7 @@
 # pragma nonreentrancy off
 """
 @title Spacemine Planets Collection
-@custom:contract-name Planets
+@custom:contract-name planets
 @license MIT
 @notice ERC-721 collection of worlds that nobody owns. Every planet
         is minted to this contract itself and can never move. It is
@@ -110,11 +110,6 @@ _SUPPORTED_INTERFACES: constant(bytes4[6]) = [
 MAX_NODES_PER_PLANET: public(constant(uint256)) = 16
 
 
-# @dev Biomes: 0 = Terran, 1 = Desert, 2 = Ice, 3 = Volcanic,
-# 4 = Ash, 5 = Jungle.
-BIOME_COUNT: public(constant(uint8)) = 6
-
-
 # @dev The inclusive bounds for `size`.
 MIN_SIZE: public(constant(uint8)) = 1
 MAX_SIZE: public(constant(uint8)) = 10
@@ -150,7 +145,7 @@ event Locked:
 event PlanetCreated:
     planet_id: indexed(uint256)
     name: String[32]
-    biome: uint8
+    biome: IPlanets.Biome
     size: uint8
     coord_x: int32
     coord_y: int32
@@ -290,7 +285,7 @@ def locked(token_id: uint256) -> bool:
 @external
 def create_planet(
     name: String[32],
-    biome: uint8,
+    biome: IPlanets.Biome,
     size: uint8,
     coord_x: int32,
     coord_y: int32,
@@ -305,7 +300,7 @@ def create_planet(
             A richness of 0 means the planet can host no node of
             that kind.
     @param name The maximum 32-character non-empty planet name.
-    @param biome The 1-byte biome (0..`BIOME_COUNT` - 1).
+    @param biome The `IPlanets.Biome` (exactly one member).
     @param size The 1-byte size (`MIN_SIZE`..`MAX_SIZE`).
     @param coord_x The 4-byte signed x coordinate.
     @param coord_y The 4-byte signed y coordinate.
@@ -317,7 +312,10 @@ def create_planet(
     """
     ownable._check_owner()
     assert len(name) != empty(uint256), "planets: empty name"
-    assert biome < BIOME_COUNT, "planets: invalid biome"
+    # Out-of-range flag values are rejected by the ABI decoder; this
+    # rejects the empty flag and combinations of several biomes.
+    biome_bits: uint256 = convert(biome, uint256)
+    assert biome_bits != empty(uint256) and biome_bits & (biome_bits - 1) == empty(uint256), "planets: invalid biome"
     assert size >= MIN_SIZE and size <= MAX_SIZE, "planets: invalid size"
     assert mineral_richness_bps <= MAX_RICHNESS_BPS, "planets: invalid richness"
     assert gas_richness_bps <= MAX_RICHNESS_BPS, "planets: invalid richness"

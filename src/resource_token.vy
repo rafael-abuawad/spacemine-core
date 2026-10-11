@@ -2,7 +2,7 @@
 # pragma nonreentrancy off
 """
 @title Spacemine Resource Token (MNRL / GAS)
-@custom:contract-name ResourceToken
+@custom:contract-name resource_token
 @license MIT
 @notice snekmate `erc20` with 18 decimals, deployed twice as
         `Spacemine Minerals`/`MNRL` and `Spacemine Gas`/`GAS`.

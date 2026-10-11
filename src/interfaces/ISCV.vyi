@@ -10,13 +10,29 @@
 """
 
 
+# @dev Resource kinds of a mining node. Flag members take the values
+# 2**n (MINERAL = 1, GAS = 2). Exactly one member must be set.
+flag ResourceKind:
+    MINERAL
+    GAS
+
+
+# @dev SCV rarity tiers (STANDARD = 1, ADVANCED = 2, ELITE = 4,
+# PROTOTYPE = 8). `empty(Tier)` (0) means "not revealed yet".
+flag Tier:
+    STANDARD
+    ADVANCED
+    ELITE
+    PROTOTYPE
+
+
 # @dev Per-token on-chain properties. The field order is part
 # of the ABI (structs are encoded as tuples) and therefore
 # must not change; see `docs/RENDERER_INTERFACE.md`.
 struct SCVProperties:
     seed: bytes32
     revealed: bool
-    model: uint8
+    model: Tier
     mining_power: uint16
     mineral_efficiency_bps: uint16
     gas_efficiency_bps: uint16
@@ -48,22 +64,22 @@ def is_revealed(token_id: uint256) -> bool:
 
 @external
 @view
-def mining_weight(token_id: uint256, kind: uint8) -> uint256:
+def mining_weight(token_id: uint256, kind: ResourceKind) -> uint256:
     """
     @dev Returns the staking weight of `token_id` for a node of `kind`.
     @param token_id The 32-byte identifier of the token.
-    @param kind The 1-byte resource kind (0 = mineral, 1 = gas).
+    @param kind The resource kind.
     @return uint256 The 32-byte mining weight.
     """
     ...
 
 
 @external
-def record_mined(token_id: uint256, kind: uint8, amount: uint256):
+def record_mined(token_id: uint256, kind: ResourceKind, amount: uint256):
     """
     @dev Adds `amount` to the lifetime stats of `token_id`.
     @param token_id The 32-byte identifier of the token.
-    @param kind The 1-byte resource kind (0 = mineral, 1 = gas).
+    @param kind The resource kind.
     @param amount The 32-byte amount that has been mined.
     """
     ...

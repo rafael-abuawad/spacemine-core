@@ -2,7 +2,7 @@
 
 import boa
 
-from helpers import E18, KIND_GAS, KIND_MINERAL, SCV_PRICE, fund_credits
+from helpers import ASH, E18, FRIGATE, KIND_GAS, KIND_MINERAL, SCV_PRICE, fund_credits
 
 
 def test_full_flow(world, deployer, alice):
@@ -17,10 +17,12 @@ def test_full_flow(world, deployer, alice):
     )
 
     # Admin seeds the universe.
-    planet = planets.create_planet("Char", 4, 6, 120, -45, 12_000, 8_000, sender=deployer)
+    planet = planets.create_planet("Char", ASH, 6, 120, -45, 12_000, 8_000, sender=deployer)
     patch = mining.create_node(planet, KIND_MINERAL, 3, 1_000_000 * E18, E18, sender=deployer)
     geyser = mining.create_node(planet, KIND_GAS, 3, 1_000_000 * E18, E18, sender=deployer)
-    frigate = ships.create_ship_type("Valkyrie", 1, 100 * E18, 50 * E18, 1_000, 300, 120, 60, 60, 200, sender=deployer)
+    frigate = ships.create_ship_type(
+        "Valkyrie", FRIGATE, 100 * E18, 50 * E18, 1_000, 300, 120, 60, 60, 200, sender=deployer
+    )
     assert planets.nodes_of(planet) == [patch, geyser]
     assert planets.ownerOf(planet) == planets.address
 

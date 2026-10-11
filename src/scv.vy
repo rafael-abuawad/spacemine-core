@@ -2,7 +2,7 @@
 # pragma nonreentrancy off
 """
 @title Spacemine SCV (Mining Bot) Collection
-@custom:contract-name SCV
+@custom:contract-name scv
 @license MIT
 @notice ERC-721 mining bots sold for CREDITS. Every SCV carries
         token-specific on-chain properties that are assigned
@@ -14,10 +14,15 @@
            and rolls the properties from the seed.
         A buyer contract can therefore not inspect its roll inside
         the minting transaction and revert on bad outcomes.
-        If the committed block hash is no longer retrievable (i.e.
-        older than 256 blocks, or 8,191 blocks with EIP-2935), the
-        SCV receives fixed baseline stats equal to the *worst*
-        possible Standard roll, so waiting out a bad roll never pays.
+        If the committed block hash is no longer retrievable (older
+        than `BLOCKHASH_WINDOW` blocks), the SCV receives fixed baseline
+        stats equal to the *worst* possible Standard roll, so waiting
+        out a bad roll never pays.
+        Only the native `blockhash` is used. On Arbitrum Orbit chains
+        (Robinhood Chain), `block.number` is an estimate of the parent
+        chain block number and `blockhash` is a sequencer-derived
+        pseudo-random value; the EIP-2935 history contract is indexed
+        by L2 block numbers, so it is deliberately not queried.
         The collection uses snekmate's `erc721` module for the token
         logic, with the following deliberate omissions: `safe_mint`,
         `set_minter`, and `is_minter` are not exported (purchase is
@@ -88,11 +93,6 @@ from snekmate.extensions import erc2981
 initializes: erc2981[ownable := ownable]
 
 
-# @dev We import the stateless `block_hash` module to read
-# block hashes beyond 256 blocks where EIP-2935 is live.
-from snekmate.utils import block_hash
-
-
 # @dev We import and initialise the shared metadata module.
 from .modules import metadata
 initializes: metadata
@@ -156,6 +156,11 @@ MAX_PER_TX: public(constant(uint256)) = 20
 REVEAL_DELAY: public(constant(uint256)) = 2
 
 
+# @dev The number of past blocks whose hash the native `blockhash`
+# returns. Reveals after this window receive the baseline stats.
+BLOCKHASH_WINDOW: public(constant(uint256)) = 256
+
+
 # @dev The maximum number of SCVs that can be revealed in one call.
 MAX_REVEAL_BATCH: public(constant(uint256)) = 50
 
@@ -164,16 +169,12 @@ MAX_REVEAL_BATCH: public(constant(uint256)) = 50
 BURN_ADDRESS: public(constant(address)) = 0x000000000000000000000000000000000000dEaD
 
 
-# @dev Resource kinds (must match `Mining`).
-KIND_MINERAL: constant(uint8) = 0
-KIND_GAS: constant(uint8) = 1
-
-
 # @dev The basis-point denominator.
 _BPS: constant(uint256) = 10_000
 
 
-# @dev Rarity tiers: 0 = Standard, 1 = Advanced, 2 = Elite, 3 = Prototype.
+# @dev The rarity tier tables, indexed by the bit position `n` of the
+# `ISCV.Tier` member (STANDARD, ADVANCED, ELITE, PROTOTYPE).
 # The cumulative roll thresholds out of 10,000 give the probabilities
 # 60% / 25% / 12% / 3%.
 _TIER_THRESHOLDS: constant(uint256[4]) = [6_000, 8_500, 9_700, 10_000]
@@ -261,7 +262,7 @@ event Purchased:
 event Revealed:
     token_id: indexed(uint256)
     seed: bytes32
-    model: uint8
+    model: ISCV.Tier
     mining_power: uint16
     mineral_efficiency_bps: uint16
     gas_efficiency_bps: uint16
@@ -271,7 +272,7 @@ event Revealed:
 # @dev Emitted when the lifetime stats of an SCV change.
 event LifetimeStatsUpdated:
     token_id: indexed(uint256)
-    kind: uint8
+    kind: ISCV.ResourceKind
     amount: uint256
     lifetime_total: uint256
 
@@ -426,7 +427,7 @@ def buy(quantity: uint256, max_total_cost: uint256) -> uint256:
         self._properties[token_id] = ISCV.SCVProperties(
             seed=empty(bytes32),
             revealed=False,
-            model=0,
+            model=empty(ISCV.Tier),
             mining_power=0,
             mineral_efficiency_bps=0,
             gas_efficiency_bps=0,
@@ -455,9 +456,10 @@ def reveal(token_ids: DynArray[uint256, MAX_REVEAL_BATCH]):
     @notice Each token must exist and `block.number` must be greater
             than its `reveal_block`. Already revealed tokens are
             skipped silently, so a front-run reveal cannot grief
-            a batch. If the committed block hash can no longer be
-            retrieved (`block_hash._block_hash` returns zero), the
-            token receives the baseline stats with an empty seed.
+            a batch. If the committed block is more than
+            `BLOCKHASH_WINDOW` blocks old, its hash is no longer
+            retrievable and the token receives the baseline stats
+            with an empty seed.
     @param token_ids The array of up to 50 token IDs to reveal.
     """
     for token_id: uint256 in token_ids:
@@ -468,11 +470,13 @@ def reveal(token_ids: DynArray[uint256, MAX_REVEAL_BATCH]):
         commit_block: uint256 = self.reveal_block[token_id]
         assert block.number > commit_block, "scv: reveal too early"
 
-        hash: bytes32 = block_hash._block_hash(commit_block)
+        hash: bytes32 = empty(bytes32)
+        if block.number - commit_block <= BLOCKHASH_WINDOW:
+            hash = blockhash(commit_block)
         baseline: bool = hash == empty(bytes32)
         if baseline:
             props.seed = empty(bytes32)
-            props.model = 0
+            props.model = ISCV.Tier.STANDARD
             props.mining_power = BASELINE_POWER
             props.mineral_efficiency_bps = BASELINE_EFFICIENCY_BPS
             props.gas_efficiency_bps = BASELINE_EFFICIENCY_BPS
@@ -494,22 +498,22 @@ def reveal(token_ids: DynArray[uint256, MAX_REVEAL_BATCH]):
 
 
 @external
-def record_mined(token_id: uint256, kind: uint8, amount: uint256):
+def record_mined(token_id: uint256, kind: ISCV.ResourceKind, amount: uint256):
     """
     @dev Adds `amount` of resource `kind` to the lifetime stats
          of `token_id` and emits ERC-4906 `MetadataUpdate`.
     @notice Only the wired `Mining` contract can call this function.
     @param token_id The 32-byte identifier of the token.
-    @param kind The 1-byte resource kind (0 = mineral, 1 = gas).
+    @param kind The resource kind (exactly one member).
     @param amount The 32-byte amount that has been mined.
     """
     assert msg.sender == self.mining, "scv: caller is not mining"
     erc721._require_minted(token_id)
     total: uint256 = empty(uint256)
-    if kind == KIND_MINERAL:
+    if kind == ISCV.ResourceKind.MINERAL:
         total = self.lifetime_minerals[token_id] + amount
         self.lifetime_minerals[token_id] = total
-    elif kind == KIND_GAS:
+    elif kind == ISCV.ResourceKind.GAS:
         total = self.lifetime_gas[token_id] + amount
         self.lifetime_gas[token_id] = total
     else:
@@ -546,21 +550,21 @@ def is_revealed(token_id: uint256) -> bool:
 
 @external
 @view
-def mining_weight(token_id: uint256, kind: uint8) -> uint256:
+def mining_weight(token_id: uint256, kind: ISCV.ResourceKind) -> uint256:
     """
     @dev Returns `mining_power * efficiency_bps(kind) / 10_000`.
     @notice Throws if `token_id` is not revealed or `kind` is invalid.
             The minimum weight is 100 * 5,000 / 10,000 = 50.
     @param token_id The 32-byte identifier of the token.
-    @param kind The 1-byte resource kind (0 = mineral, 1 = gas).
+    @param kind The resource kind (exactly one member).
     @return uint256 The 32-byte mining weight.
     """
     props: ISCV.SCVProperties = self._properties[token_id]
     assert props.revealed, "scv: not revealed"
     efficiency: uint16 = empty(uint16)
-    if kind == KIND_MINERAL:
+    if kind == ISCV.ResourceKind.MINERAL:
         efficiency = props.mineral_efficiency_bps
-    elif kind == KIND_GAS:
+    elif kind == ISCV.ResourceKind.GAS:
         efficiency = props.gas_efficiency_bps
     else:
         raise "scv: invalid kind"
@@ -709,7 +713,8 @@ def _roll(seed: bytes32, props: ISCV.SCVProperties) -> ISCV.SCVProperties:
         if tier_roll < _TIER_THRESHOLDS[i]:
             tier = i
             break
-    result.model = convert(tier, uint8)
+    # Flag member `n` has the value `2**n`.
+    result.model = convert(1 << tier, ISCV.Tier)
 
     power_min: uint256 = _TIER_POWER_MIN[tier]
     power_span: uint256 = _TIER_POWER_MAX[tier] - power_min + 1

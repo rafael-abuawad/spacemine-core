@@ -23,16 +23,27 @@ chain_id = 300
 is_zksync = true
 prompt_live = true
 
-# Spacemine production target. The chain has not been decided yet.
-# TODO_CHAIN_ID: set `url` and `chain_id` once the launchpad chain for CREDITS is known.
-# TODO_CHAIN_ID: confirm EIP-2935 (historical block hashes) is live on that chain; SCV
-#                reveals fall back to baseline stats after 256 blocks otherwise.
-# TODO_CHAIN_ID: set CREDITS_ADDRESS (and TREASURY_ADDRESS) in `.env` before deploying.
-[networks.spacemine-target]
-url = "https://TODO_CHAIN_RPC_URL"
-chain_id = 0 # TODO_CHAIN_ID
+# Robinhood Chain (Arbitrum Orbit L2, ETH gas). Notes for Spacemine:
+# - `block.number` is an estimate of the parent-chain block number and `blockhash`
+#   is a sequencer-derived pseudo-random value, so SCV reveals trust the sequencer.
+# - SCV uses only the native 256-block `blockhash` window (no EIP-2935).
+# - Set CREDITS_ADDRESS (and TREASURY_ADDRESS, RENDERER_ADDRESS) in `.env` before deploying.
+# - The public RPCs are rate-limited; use a provider URL (e.g. Alchemy) for real deploys.
+[networks.robinhood-testnet]
+url = "https://rpc.testnet.chain.robinhood.com"
+chain_id = 46630
 prompt_live = true
 save_to_db = true
-explorer_type = "blockscout" # TODO_CHAIN_ID: or "etherscan"
+explorer_uri = "https://explorer.testnet.chain.robinhood.com"
+explorer_type = "blockscout"
+
+# TODO: Robinhood Chain mainnet. Fill in `url` and `chain_id` from the official docs
+# (https://docs.robinhood.com/chain/connecting) once published there; third-party
+# listings (Chainstack) report chain ID 4663, which is not yet confirmed officially.
+[networks.robinhood]
+url = "https://TODO_ROBINHOOD_MAINNET_RPC_URL"
+chain_id = 0 # TODO: confirm mainnet chain ID
+prompt_live = true
+save_to_db = true
 
 # You can view all configuration options at https://cyfrin.github.io/moccasin/all_moccasin_toml_parameters.html

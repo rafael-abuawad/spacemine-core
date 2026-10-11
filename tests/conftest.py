@@ -1,7 +1,7 @@
 import boa
 import pytest
 
-from helpers import RENDERER
+from helpers import RENDERER, TERRAN
 from script.deploy import deploy
 
 # ---------------------------------------------------------------------------
@@ -83,4 +83,4 @@ def spaceships(world):
 @pytest.fixture
 def planet_id(planets):
     # Neutral richness so `reserve == base_reserve` for both kinds.
-    return planets.create_planet("Testworld", 0, 5, 0, 0, 10_000, 10_000)
+    return planets.create_planet("Testworld", TERRAN, 5, 0, 0, 10_000, 10_000)

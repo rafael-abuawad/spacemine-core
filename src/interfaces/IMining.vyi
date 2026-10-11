@@ -9,10 +9,14 @@
 """
 
 
+# @dev We import `ISCV` for the shared `ResourceKind` flag.
+from . import ISCV
+
+
 # @dev A resource node. The field order is part of the ABI.
 struct Node:
     planet_id: uint256
-    kind: uint8
+    kind: ISCV.ResourceKind
     max_slots: uint8
     occupied: uint8
     reserve_total: uint256

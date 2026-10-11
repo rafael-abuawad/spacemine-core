@@ -1,7 +1,7 @@
 # pragma version ~=0.4.3
 """
 @title Mock Gambler (Malicious SCV Buyer)
-@custom:contract-name MockGambler
+@custom:contract-name mock_gambler
 @license MIT
 @notice Test-only contract that tries to keep only good SCV rolls:
         it buys, tries to reveal and read the properties inside the
@@ -15,7 +15,7 @@ interface ISCVLike:
     def buy(quantity: uint256, max_total_cost: uint256) -> uint256: nonpayable
     def reveal(token_ids: DynArray[uint256, 50]): nonpayable
     def is_revealed(token_id: uint256) -> bool: view
-    def mining_weight(token_id: uint256, kind: uint8) -> uint256: view
+    def mining_weight(token_id: uint256, kind: uint256) -> uint256: view
 
 
 interface IERC20Like:
@@ -48,5 +48,5 @@ def buy_and_peek(scv: address, quantity: uint256, max_total_cost: uint256) -> ui
 def buy_if_good(scv: address, max_total_cost: uint256, min_weight: uint256) -> uint256:
     first_id: uint256 = extcall ISCVLike(scv).buy(1, max_total_cost)
     assert staticcall ISCVLike(scv).is_revealed(first_id), "gambler: roll unknown"
-    assert staticcall ISCVLike(scv).mining_weight(first_id, 0) >= min_weight, "gambler: bad roll"
+    assert staticcall ISCVLike(scv).mining_weight(first_id, 1) >= min_weight, "gambler: bad roll"
     return first_id

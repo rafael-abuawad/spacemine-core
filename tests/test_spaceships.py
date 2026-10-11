@@ -2,7 +2,11 @@ import boa
 import pytest
 
 from helpers import (
+    CRUISER,
     E18,
+    FIGHTER,
+    FREIGHTER,
+    FRIGATE,
     SHIPS_BASE,
     ZERO_ADDRESS,
     event_names,
@@ -11,9 +15,7 @@ from helpers import (
     load_mock,
     log_args,
 )
-from src import Spaceships
-
-FIGHTER, FRIGATE, CRUISER = 0, 1, 3
+from src import spaceships as Spaceships
 
 
 def create(spaceships, sender, name="Viper", ship_class=FIGHTER, mineral=100 * E18, gas=0, max_supply=0, stats=None):
@@ -121,7 +123,8 @@ def test_create_ship_type(spaceships, deployer):
     "kwargs,message",
     [
         ({"name": ""}, "spaceships: empty name"),
-        ({"ship_class": 5}, "spaceships: invalid class"),
+        ({"ship_class": 0}, "spaceships: invalid class"),  # empty flag
+        ({"ship_class": FIGHTER | FREIGHTER}, "spaceships: invalid class"),  # two classes
         ({"mineral": 0, "gas": 0}, "spaceships: free ship"),
     ],
 )
@@ -427,7 +430,7 @@ def fund_contract(world, contract, minerals=10**24, gas=10**24):
 
 def test_reentrant_receiver_cannot_double_mint(world, spaceships, ships):
     fighter = ships[0]
-    receiver = load_mock("MockReceiver")
+    receiver = load_mock("mock_receiver")
     fund_contract(world, receiver)
     receiver.set_mode(2)
     receiver.set_reentry(spaceships.address, calldata(spaceships.buy, fighter, 1, 10**24, 0))
@@ -444,7 +447,7 @@ def test_reentrant_receiver_cannot_double_mint(world, spaceships, ships):
 
 def test_reentrant_batch_receiver_cannot_double_mint(world, spaceships, ships):
     fighter, frigate, _ = ships
-    receiver = load_mock("MockReceiver")
+    receiver = load_mock("mock_receiver")
     fund_contract(world, receiver)
     receiver.set_mode(2)
     receiver.set_reentry(spaceships.address, calldata(spaceships.buy_batch, [fighter], [1], 10**24, 10**24))
@@ -461,7 +464,7 @@ def test_reentrant_batch_receiver_cannot_double_mint(world, spaceships, ships):
 
 def test_reentry_into_admin_paths_blocked(world, spaceships, ships, deployer):
     # Even if the owner were a hostile receiver, the hook cannot reach nonreentrant setters.
-    receiver = load_mock("MockReceiver")
+    receiver = load_mock("mock_receiver")
     fund_contract(world, receiver)
     receiver.set_mode(2)
     receiver.set_reentry(spaceships.address, calldata(spaceships.set_ship_prices, ships[0], 1, 0))
@@ -471,7 +474,7 @@ def test_reentry_into_admin_paths_blocked(world, spaceships, ships, deployer):
 
 
 def test_accepting_receiver_can_buy(world, spaceships, ships):
-    receiver = load_mock("MockReceiver")
+    receiver = load_mock("mock_receiver")
     fund_contract(world, receiver)
     receiver.execute(spaceships.address, calldata(spaceships.buy, ships[0], 2, 10**24, 0))
     assert spaceships.balanceOf(receiver.address, ships[0]) == 2
@@ -479,7 +482,7 @@ def test_accepting_receiver_can_buy(world, spaceships, ships):
 
 
 def test_rejecting_receivers_cannot_buy(world, spaceships, ships):
-    receiver = load_mock("MockReceiver")
+    receiver = load_mock("mock_receiver")
     fund_contract(world, receiver)
     receiver.set_mode(1)
     with boa.reverts("receiver: rejected"):
@@ -492,7 +495,7 @@ def test_rejecting_receivers_cannot_buy(world, spaceships, ships):
 
 
 def test_non_receiver_contract_cannot_buy(world, spaceships, ships):
-    caller = load_mock("MockCaller")
+    caller = load_mock("mock_caller")
     fund_contract(world, caller)
     with boa.reverts():
         caller.execute(spaceships.address, calldata(spaceships.buy, ships[0], 1, 10**24, 0))

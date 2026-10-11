@@ -11,13 +11,17 @@ E18 = 10**18
 MAX_UINT256 = 2**256 - 1
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 DEAD_ADDRESS = "0x000000000000000000000000000000000000dEaD"
-KIND_MINERAL = 0
-KIND_GAS = 1
+
+# Vyper `flag` values: member `n` encodes as `2**n` (ABI type `uint256`).
+KIND_MINERAL, KIND_GAS = 1, 2  # ISCV.ResourceKind
+STANDARD, ADVANCED, ELITE, PROTOTYPE = 1, 2, 4, 8  # ISCV.Tier
+TERRAN, DESERT, ICE, VOLCANIC, ASH, JUNGLE = 1, 2, 4, 8, 16, 32  # IPlanets.Biome
+FIGHTER, FRIGATE, FREIGHTER, CRUISER, CARRIER = 1, 2, 4, 8, 16  # spaceships.ShipClass
 SCV_PRICE = 100 * E18
 PRECISION = 10**18
 RENDERER = "0x1111111111111111111111111111111111111111"
 
-# EIP-2935 history contract (its runtime-code hash matches snekmate `block_hash`).
+# EIP-2935 history contract. `scv` deliberately never queries it (see `scv.vy` @notice).
 HISTORY_ADDRESS = "0x0000F90827F1C53a10cb7A02335B175320002935"
 HISTORY_CODE = bytes.fromhex(
     "3373fffffffffffffffffffffffffffffffffffffffe14604657602036036042575f35600143038111604257"
@@ -46,14 +50,24 @@ def events(contract, name: str) -> list:
 
 
 def expected_roll(seed: bytes) -> tuple[int, int, int, int]:
-    """Python mirror of `SCV._roll`: (model, mining_power, mineral_bps, gas_bps)."""
+    """Python mirror of `scv._roll`: (model flag, mining_power, mineral_bps, gas_bps)."""
     rand = int.from_bytes(seed, "big")
     tier = next(i for i, threshold in enumerate(TIER_THRESHOLDS) if rand % 10_000 < threshold)
     low, high = TIER_POWER[tier]
     power = low + (rand >> 64) % (high - low + 1)
     mineral = 5_000 + (rand >> 128) % 10_001
     gas = 5_000 + (rand >> 192) % 10_001
-    return tier, power, mineral, gas
+    return 1 << tier, power, mineral, gas
+
+
+def set_block_hash(target_block: int, block_hash: bytes):
+    """Plant the native `blockhash(target_block)` (must be within the last 256 blocks)."""
+    offset = block_number() - 1 - target_block
+    assert 0 <= offset < 256, "target outside the native blockhash window"
+    hashes = list(boa.env.evm.patch.prev_hashes) + [b"\x00" * 32] * 256
+    hashes = hashes[:256]
+    hashes[offset] = block_hash
+    boa.env.evm.patch.prev_hashes = hashes
 
 
 def log_args(log) -> tuple:

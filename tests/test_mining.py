@@ -2,10 +2,14 @@ import boa
 import pytest
 
 from helpers import (
+    ASH,
     E18,
+    ICE,
+    JUNGLE,
     KIND_GAS,
     KIND_MINERAL,
     MAX_UINT256,
+    TERRAN,
     NodeModel,
     buy_and_reveal,
     buy_scvs,
@@ -14,7 +18,10 @@ from helpers import (
     now,
     stake,
 )
-from src import SCV, Mining, Planets, ResourceToken
+from src import mining as Mining
+from src import planets as Planets
+from src import resource_token as ResourceToken
+from src import scv as SCV
 
 RESERVE = 1_000_000 * E18
 RATE = E18
@@ -44,13 +51,18 @@ def model_for(mining, node_id) -> NodeModel:
 
 
 def test_create_node_scales_reserve_by_richness(mining, planets, deployer):
-    planet = planets.create_planet("Char", 4, 6, 0, 0, 12_000, 8_000, sender=deployer)
+    planet = planets.create_planet("Char", ASH, 6, 0, 0, 12_000, 8_000, sender=deployer)
     mineral_node = mining.create_node(planet, KIND_MINERAL, 3, 1_000 * E18, E18, sender=deployer)
     created = events(mining, "NodeCreated")[0]
     gas_node = mining.create_node(planet, KIND_GAS, 2, 1_000 * E18, E18 // 2, sender=deployer)
 
     assert (mineral_node, gas_node) == (1, 2)
-    assert (created.node_id, created.planet_id, created.kind, created.reserve_total) == (1, planet, 0, 1_200 * E18)
+    assert (created.node_id, created.planet_id, created.kind, created.reserve_total) == (
+        1,
+        planet,
+        KIND_MINERAL,
+        1_200 * E18,
+    )
     assert planets.nodes_of(planet) == [1, 2]
     node = mining.node(mineral_node)
     assert (node.planet_id, node.kind, node.max_slots, node.occupied) == (planet, KIND_MINERAL, 3, 0)
@@ -64,7 +76,8 @@ def test_create_node_scales_reserve_by_richness(mining, planets, deployer):
 @pytest.mark.parametrize(
     "kind,slots,reserve,rate,message",
     [
-        (2, 3, RESERVE, RATE, "mining: invalid kind"),
+        (0, 3, RESERVE, RATE, "mining: invalid kind"),  # empty flag
+        (KIND_MINERAL | KIND_GAS, 3, RESERVE, RATE, "mining: invalid kind"),
         (KIND_MINERAL, 0, RESERVE, RATE, "mining: invalid slots"),
         (KIND_MINERAL, 9, RESERVE, RATE, "mining: invalid slots"),
         (KIND_MINERAL, 3, 0, RATE, "mining: invalid reserve"),
@@ -90,7 +103,7 @@ def test_create_node_unknown_planet(mining, deployer):
 
 
 def test_create_node_zero_richness(mining, planets, deployer):
-    planet = planets.create_planet("Barren", 2, 2, 0, 0, 5_000, 0, sender=deployer)
+    planet = planets.create_planet("Barren", ICE, 2, 0, 0, 5_000, 0, sender=deployer)
     with boa.reverts("mining: zero reserve"):
         mining.create_node(planet, KIND_GAS, 3, RESERVE, RATE, sender=deployer)
     with boa.reverts("mining: zero reserve"):  # 1 * 5_000 // 10_000 rounds down to zero
@@ -242,7 +255,7 @@ def test_stake_requires_approval(world, mining, node_id, alice):
 
 
 def test_owner_stake_limit(world, mining, scv, planets, deployer, alice):
-    planet = planets.create_planet("Hive", 5, 10, 0, 0, 10_000, 10_000, sender=deployer)
+    planet = planets.create_planet("Hive", JUNGLE, 10, 0, 0, 10_000, 10_000, sender=deployer)
     nodes = [mining.create_node(planet, KIND_MINERAL, 8, RESERVE, RATE, sender=deployer) for _ in range(16)]
     ids = []
     for _ in range(6):
@@ -255,7 +268,7 @@ def test_owner_stake_limit(world, mining, scv, planets, deployer, alice):
     for index, node in enumerate(nodes):
         mining.stake(node, ids[index * 8 : index * 8 + 8], sender=alice)
     assert len(mining.staked_by(alice)) == 128
-    other_planet = planets.create_planet("Overflow", 5, 10, 1, 1, 10_000, 10_000, sender=deployer)
+    other_planet = planets.create_planet("Overflow", JUNGLE, 10, 1, 1, 10_000, 10_000, sender=deployer)
     overflow_node = mining.create_node(other_planet, KIND_MINERAL, 1, RESERVE, RATE, sender=deployer)
     with boa.reverts("mining: owner stake limit"):
         mining.stake(overflow_node, [ids[128]], sender=alice)
@@ -268,7 +281,7 @@ def test_wiring_checks(credits, deployer, alice):
     gas = ResourceToken.deploy("Spacemine Gas", "GAS")
     mining = Mining.deploy(scv.address, planets.address, minerals.address, gas.address)
     planets.set_mining(mining.address)
-    planet = planets.create_planet("Wired", 0, 1, 0, 0, 10_000, 10_000)
+    planet = planets.create_planet("Wired", TERRAN, 1, 0, 0, 10_000, 10_000)
     node = mining.create_node(planet, KIND_MINERAL, 3, RESERVE, RATE)
 
     with boa.reverts("mining: scv not wired"):

@@ -27,14 +27,20 @@ import boa
 from moccasin.boa_tools import VyperContract
 from moccasin.config import get_active_network
 
-from src import SCV, Mining, Planets, ResourceToken, Spaceships
+from src import mining as Mining
+from src import planets as Planets
+from src import resource_token as ResourceToken
+from src import scv as SCV
+from src import spaceships as Spaceships
 
 ROOT = Path(__file__).resolve().parent.parent
 MOCKS = ROOT / "tests" / "mocks"
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
-KIND_MINERAL = 0
-KIND_GAS = 1
+# Vyper `flag` values (member `n` encodes as `2**n`).
+KIND_MINERAL, KIND_GAS = 1, 2
+BIOME_ASH = 16
+SHIP_FIGHTER, SHIP_FRIGATE, SHIP_CRUISER = 1, 2, 8
 E18 = 10**18
 
 
@@ -88,7 +94,7 @@ def _is_local() -> bool:
 
 def deploy_mock_credits() -> VyperContract:
     """Deploy the test-only CREDITS mock (never used on live networks)."""
-    return boa.load_partial(str(MOCKS / "MockCredits.vy")).deploy()
+    return boa.load_partial(str(MOCKS / "mock_credits.vy")).deploy()
 
 
 def deploy(
@@ -181,15 +187,15 @@ def deploy(
 
 def seed_demo_content(planets: VyperContract, mining: VyperContract, spaceships: VyperContract) -> None:
     """One planet with 2 mineral patches and 1 geyser, plus 3 ship types."""
-    planet_id = planets.create_planet("Char", 4, 6, 120, -45, 12_000, 8_000)
+    planet_id = planets.create_planet("Char", BIOME_ASH, 6, 120, -45, 12_000, 8_000)
     mining.create_node(planet_id, KIND_MINERAL, 3, 1_500_000 * E18, E18)
     mining.create_node(planet_id, KIND_MINERAL, 3, 1_500_000 * E18, E18)
     mining.create_node(planet_id, KIND_GAS, 3, 1_000_000 * E18, E18 // 2)
 
     # name, class, mineral_cost, gas_cost, max_supply, hull, shield, attack, speed, cargo
-    spaceships.create_ship_type("Viper", 0, 500 * E18, 0, 0, 100, 20, 35, 90, 10)
-    spaceships.create_ship_type("Valkyrie", 1, 1_500 * E18, 750 * E18, 5_000, 300, 120, 60, 60, 200)
-    spaceships.create_ship_type("Behemoth", 3, 2_000 * E18, 6_000 * E18, 500, 900, 400, 250, 25, 800)
+    spaceships.create_ship_type("Viper", SHIP_FIGHTER, 500 * E18, 0, 0, 100, 20, 35, 90, 10)
+    spaceships.create_ship_type("Valkyrie", SHIP_FRIGATE, 1_500 * E18, 750 * E18, 5_000, 300, 120, 60, 60, 200)
+    spaceships.create_ship_type("Behemoth", SHIP_CRUISER, 2_000 * E18, 6_000 * E18, 500, 900, 400, 250, 25, 800)
 
 
 def moccasin_main() -> Spacemine:

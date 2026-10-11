@@ -3,17 +3,21 @@
 import boa
 
 from helpers import (
+    FIGHTER,
     MAX_UINT256,
     PLANETS_BASE,
     RENDERER,
     SCV_BASE,
     SHIPS_BASE,
+    TERRAN,
     buy_scvs,
     event_names,
     events,
     log_args,
 )
-from src import SCV, Planets, Spaceships
+from src import planets as Planets
+from src import scv as SCV
+from src import spaceships as Spaceships
 
 NEW_BASE = "web3://0x2222222222222222222222222222222222222222:8453/v2/"
 
@@ -37,7 +41,7 @@ def test_scv_set_metadata_uri(world, scv, alice, deployer):
 
 
 def test_planets_token_uri(planets, deployer):
-    planets.create_planet("Aiur", 0, 3, 0, 0, 10_000, 10_000, sender=deployer)
+    planets.create_planet("Aiur", TERRAN, 3, 0, 0, 10_000, 10_000, sender=deployer)
     assert planets.tokenURI(1) == f"web3://{RENDERER}:1/planets/1"
     with boa.reverts("erc721: invalid token ID"):
         planets.tokenURI(2)
@@ -48,10 +52,10 @@ def test_planets_token_uri(planets, deployer):
 
 
 def test_spaceships_uri(spaceships, deployer):
-    spaceships.create_ship_type("Viper", 0, 1, 0, 0, 1, 1, 1, 1, 1, sender=deployer)
+    spaceships.create_ship_type("Viper", FIGHTER, 1, 0, 0, 1, 1, 1, 1, 1, sender=deployer)
     uri_logs = events(spaceships, "URI")
     assert [log_args(log) for log in uri_logs] == [(f"web3://{RENDERER}:1/ships/1", 1)]
-    spaceships.create_ship_type("Wraith", 0, 1, 0, 0, 1, 1, 1, 1, 1, sender=deployer)
+    spaceships.create_ship_type("Wraith", FIGHTER, 1, 0, 0, 1, 1, 1, 1, 1, sender=deployer)
     assert spaceships.uri(1) == SHIPS_BASE + "1"
     assert spaceships.uri(2) == SHIPS_BASE + "2"
     assert "{id}" not in spaceships.uri(2)
@@ -63,7 +67,7 @@ def test_spaceships_uri(spaceships, deployer):
 
 def test_spaceships_set_metadata_uri_emits_uri_per_type(spaceships, deployer):
     for name in ("A", "B", "C"):
-        spaceships.create_ship_type(name, 0, 1, 0, 0, 1, 1, 1, 1, 1, sender=deployer)
+        spaceships.create_ship_type(name, FIGHTER, 1, 0, 0, 1, 1, 1, 1, 1, sender=deployer)
     spaceships.set_metadata_uri(NEW_BASE, ".json", sender=deployer)
     assert event_names(spaceships) == ["MetadataURIUpdated", "URI", "URI", "URI"]
     assert [log_args(log) for log in events(spaceships, "URI")] == [

@@ -2,7 +2,7 @@
 # pragma nonreentrancy off
 """
 @title Mock CREDITS (Plain ERC-20)
-@custom:contract-name MockCredits
+@custom:contract-name mock_credits
 @license MIT
 @notice Test-only stand-in for the third-party CREDITS token:
         a plain snekmate `erc20` whose deployer can `mint`.

@@ -20,12 +20,12 @@ flowchart LR
     Player((Player))
 
     subgraph spacemine[Spacemine contracts]
-        SCV[SCV.vy<br/>ERC-721 mining bots<br/>commit-reveal properties]
-        P[Planets.vy<br/>ERC-721 + ERC-5192<br/>self-owned, soulbound]
-        M[Mining.vy<br/>resource nodes +<br/>Unipool staking]
-        MNRL[ResourceToken.vy<br/>MNRL ERC-20]
-        GAS[ResourceToken.vy<br/>GAS ERC-20]
-        S[Spaceships.vy<br/>ERC-1155 ship types]
+        SCV[scv.vy<br/>ERC-721 mining bots<br/>commit-reveal properties]
+        P[planets.vy<br/>ERC-721 + ERC-5192<br/>self-owned, soulbound]
+        M[mining.vy<br/>resource nodes +<br/>Unipool staking]
+        MNRL[resource_token.vy<br/>MNRL ERC-20]
+        GAS[resource_token.vy<br/>GAS ERC-20]
+        S[spaceships.vy<br/>ERC-1155 ship types]
     end
 
     Player -- "buy(qty) pays CREDITS" --> SCV
@@ -46,11 +46,11 @@ flowchart LR
 
 | Contract | Standard | snekmate modules | Purpose |
 |---|---|---|---|
-| `src/SCV.vy` | ERC-721, Enumerable, Metadata, ERC-4494, ERC-4906, ERC-2981, ERC-5267, ERC-7572 | `erc721`, `erc2981`, `ownable`, `ownable_2step`, `block_hash` | Mining bots. Sold for CREDITS; properties assigned by commit-reveal. |
-| `src/Planets.vy` | ERC-721, Enumerable, Metadata, ERC-4906, ERC-5192, ERC-7572 | `erc721`, `ownable`, `ownable_2step` | Worlds minted to the contract itself; never transferable. Registry of nodes. |
-| `src/ResourceToken.vy` | ERC-20, EIP-2612, ERC-5267 | `erc20`, `ownable`, `ownable_2step` | Deployed twice: `Spacemine Minerals`/`MNRL` and `Spacemine Gas`/`GAS`. |
-| `src/Mining.vy` | — | `ownable`, `ownable_2step`, `pausable` | All resource nodes, plus per-SCV Unipool accounting. |
-| `src/Spaceships.vy` | ERC-1155, Metadata URI, ERC-2981, ERC-7572 | `erc1155`, `erc2981`, `ownable`, `ownable_2step` | Ship types bought with MNRL/GAS (the resource sink). |
+| `src/scv.vy` | ERC-721, Enumerable, Metadata, ERC-4494, ERC-4906, ERC-2981, ERC-5267, ERC-7572 | `erc721`, `erc2981`, `ownable`, `ownable_2step` | Mining bots. Sold for CREDITS; properties assigned by commit-reveal. |
+| `src/planets.vy` | ERC-721, Enumerable, Metadata, ERC-4906, ERC-5192, ERC-7572 | `erc721`, `ownable`, `ownable_2step` | Worlds minted to the contract itself; never transferable. Registry of nodes. |
+| `src/resource_token.vy` | ERC-20, EIP-2612, ERC-5267 | `erc20`, `ownable`, `ownable_2step` | Deployed twice: `Spacemine Minerals`/`MNRL` and `Spacemine Gas`/`GAS`. |
+| `src/mining.vy` | — | `ownable`, `ownable_2step`, `pausable` | All resource nodes, plus per-SCV Unipool accounting. |
+| `src/spaceships.vy` | ERC-1155, Metadata URI, ERC-2981, ERC-7572 | `erc1155`, `erc2981`, `ownable`, `ownable_2step` | Ship types bought with MNRL/GAS (the resource sink). |
 | `src/modules/metadata.vy` | ERC-7572 | — | Shared `metadata_base`/`metadata_suffix`/`contractURI` storage. |
 | `src/interfaces/*.vyi` | — | — | Project-only interfaces (`ISCV`, `IPlanets`, `IMining`, `IResourceToken`) and the shared structs. |
 
@@ -74,17 +74,17 @@ Every tunable is a `constant` or a constructor/owner parameter.
 
 | # | Decision | Implementation | Where to change |
 |---|---|---|---|
-| D1 | Mining pays two new ERC-20s | `ResourceToken.vy` deployed as MNRL and GAS (18 decimals). Mining is the **only** minter, and per-node emission is capped by the node's reserve. | `script/deploy.py` |
+| D1 | Mining pays two new ERC-20s | `resource_token.vy` deployed as MNRL and GAS (18 decimals). Mining is the **only** minter, and per-node emission is capped by the node's reserve. | `script/deploy.py` |
 | D2 | CREDITS sink | `transferFrom(buyer → treasury)`. The `burn_proceeds_` constructor flag sends to `0x…dEaD` instead (immutable). `set_treasury` is owner-only and disabled in burn mode. | `SCV.__init__`, `SCV_BURN_PROCEEDS` env |
-| D3 | SCV pricing | `price` (owner-settable, non-zero), `max_supply` (can only decrease, never below minted), `MAX_PER_TX = 20`. `buy(quantity, max_total_cost)` gives slippage protection. | `SCV.vy` constants, `set_price`, `set_max_supply` |
-| D4 | Property randomness | Commit-reveal: `reveal_block = block.number + REVEAL_DELAY (2)`. `seed = keccak256(abi_encode(blockhash, id, self))`. Block hashes are read via snekmate `block_hash`, so the window is 8,191 blocks where EIP-2935 is live and 256 blocks otherwise. If the hash has expired, the token gets the **baseline**: the worst possible roll (Standard, power 100, 5,000/5,000 bps), so waiting out a bad roll never helps. | `SCV.vy` tier tables |
-| D5 | Staking custody | SCVs are escrowed in Mining with `transferFrom` and can only be returned to the address that staked them. `onERC721Received` always reverts (`mining: use stake`): a safe transfer would create an SCV with no position and no way to recover it. | `Mining.vy` |
+| D3 | SCV pricing | `price` (owner-settable, non-zero), `max_supply` (can only decrease, never below minted), `MAX_PER_TX = 20`. `buy(quantity, max_total_cost)` gives slippage protection. | `scv.vy` constants, `set_price`, `set_max_supply` |
+| D4 | Property randomness | Commit-reveal: `reveal_block = block.number + REVEAL_DELAY (2)`. `seed = keccak256(abi_encode(blockhash, id, self))`. Only the native `blockhash` is used, with a 256-block window (`BLOCKHASH_WINDOW`); EIP-2935 is deliberately not queried (see Security notes). If the hash has expired, the token gets the **baseline**: the worst possible roll (Standard, power 100, 5,000/5,000 bps), so waiting out a bad roll never helps. | `scv.vy` tier tables, `BLOCKHASH_WINDOW` |
+| D5 | Staking custody | SCVs are escrowed in Mining with `transferFrom` and can only be returned to the address that staked them. `onERC721Received` always reverts (`mining: use stake`): a safe transfer would create an SCV with no position and no way to recover it. | `mining.vy` |
 | D6 | Reward accounting | Per-SCV Unipool: every position stores its own `reward_per_weight_paid`. Time only counts while `total_weight > 0`; emission is `min(rate·dt, reserve_remaining)`; all divisions round down. | `Mining._project` |
-| D7 | Planet ownership | Minted to the Planets contract itself. Transfer and approval functions exist but always revert (`planets: soulbound`), and ERC-5192 `locked() == true`. | `Planets.vy` |
+| D7 | Planet ownership | Minted to the Planets contract itself. Transfer and approval functions exist but always revert (`planets: soulbound`), and ERC-5192 `locked() == true`. | `planets.vy` |
 | D8 | Upgradability | None. No proxies, no `selfdestruct`, no delegatecall. | — |
 | D9 | Royalties | snekmate `erc2981` on SCV and Spaceships, default royalty only (owner-settable; deploy default 5% to the treasury). Planets have none. | `ROYALTY_BPS` env |
 | D10 | Spaceship payment | `(mineral_cost, gas_cost)` per type, where either may be 0 but not both. Payment is **burned** via `burn_from` by default. `set_treasury_mode(true)` routes it to `treasury` with `transferFrom`. | `Spaceships.set_treasury_mode` |
-| D11 | Spaceship supply | Per type: `max_supply` (0 = unlimited; can only decrease, never below `minted`) and `active`. Prices are mutable; stats are immutable. `buy`/`buy_batch` take `max_mineral_cost`/`max_gas_cost`. Burning a ship doesn't free capped supply. | `Spaceships.vy` |
+| D11 | Spaceship supply | Per type: `max_supply` (0 = unlimited; can only decrease, never below `minted`) and `active`. Prices are mutable; stats are immutable. `buy`/`buy_batch` take `max_mineral_cost`/`max_gas_cost`. Burning a ship doesn't free capped supply. | `spaceships.vy` |
 
 ### Other choices and deviations from the spec
 
@@ -103,6 +103,9 @@ Every tunable is a `constant` or a constructor/owner parameter.
 | `Mining.node()` | Returns the node projected to `block.timestamp` | The renderer sees the live reserve without a transaction. |
 | `Position.accrued` | Kept for ABI stability; always 0 | Every settlement in v1 pays out immediately. |
 | `ShipType.class` | Named `ship_class` | `class` is a reserved keyword in Vyper. |
+| Enum-like fields | Vyper `flag` types: `ISCV.Tier`, `ISCV.ResourceKind`, `IPlanets.Biome`, `spaceships.ShipClass` | Member `n` has the value `2**n` and the ABI type is `uint256`. Inputs must set exactly one member (the empty flag and combinations revert). Vyper has no arrays of flags, so tier tables are indexed by bit position and `mining` keeps per-batch kinds as Booleans. |
+| File names | Contracts and mocks are `snake_case.vy`; interfaces stay `CamelCase.vyi` | Project convention. Python code aliases deployers back to CamelCase (`from src import scv as SCV`). |
+| SCV randomness source | Native `blockhash` only | Robinhood Chain is an Arbitrum Orbit chain: `block.number` is a parent-chain estimate and the EIP-2935 history contract is indexed by L2 block numbers, so snekmate `block_hash` could return an old, already-known hash. |
 | Spaceships `uri(id)` | Reverts for unknown types | Consistent with `tokenURI`. `URI` is emitted at creation and, for every existing type, on `set_metadata_uri`. That loop is bounded by `MAX_SHIP_TYPES = 64`. |
 | Spaceships supply getter | `total_supply(id)` (snekmate name) | Not renamed to `totalSupply` to avoid hand-written duplicates. |
 
@@ -166,7 +169,7 @@ for the full view surface, struct layouts, refresh events, and enum values, and
 - **Checks-effects-interactions everywhere**, and every state-changing external function in Mining
   and Spaceships, plus `buy`/`reveal` on SCV, is `@nonreentrant`. Vyper's lock is global per
   contract, so an ERC-1155 receiver hook can't re-enter any purchase or admin path. This is tested
-  with `tests/mocks/MockReceiver.vy`.
+  with `tests/mocks/mock_receiver.vy`.
 - **Rounding favours the protocol.** `emitted ≤ reserve_remaining`, `rpw += emitted·1e18 // W`, and
   `reward = w·Δrpw // 1e18`, so the total minted per node never exceeds `reserve_total`. Each
   settlement leaves less than 1 wei of dust (covered by fuzz and stateful tests).
@@ -181,14 +184,16 @@ for the full view surface, struct layouts, refresh events, and enum values, and
   | `Planets.MAX_NODES_PER_PLANET` | 16 |
   | `Spaceships.MAX_PER_TX` / `MAX_BATCH_TYPES` / `MAX_SHIP_TYPES` | 50 / 16 / 64 |
 
-- **Commit-reveal and block producers.** The seed depends on the hash of the commit block, which
-  isn't known when the buy transaction executes. The proposer (or L2 sequencer) of that block can
-  still influence its hash, by withholding a block or reordering transactions, at the cost of lost
-  block rewards and MEV. This is acceptable here because a single SCV roll is worth far less than a
-  block, because the proposer would need to know which pending mints to favour, and because the
-  outcome only affects cosmetic and mining-weight stats, not custody of funds. If the deployment
-  chain has a single centralised sequencer, consider a VRF before mainnet (see `TODO_CHAIN_ID` in
-  `moccasin.toml`).
+- **Commit-reveal on Robinhood Chain.** The seed depends on `blockhash(reveal_block)`, which isn't
+  known when the buy transaction executes, so a buyer contract still can't inspect and revert on its
+  roll. On Robinhood Chain (an Arbitrum Orbit L2), however, `block.number` is an estimate of the
+  parent-chain block number and `blockhash` is a value Arbitrum documents as "cryptographically
+  insecure, pseudo-random" — it is derived by the chain, not by independent block proposers. The
+  sequencer operator can therefore, in principle, predict or steer rolls. This is acceptable for a
+  testnet and for stats that affect only mining weight and cosmetics (never custody of funds), but
+  **before mainnet, replace the seed source with a VRF** if one is available on Robinhood Chain.
+  Since several L2 blocks share one `block.number`, `REVEAL_DELAY = 2` means about two parent-chain
+  blocks (~24 s) rather than two L2 blocks.
 - **Unstake can't be blocked**: it doesn't check pause, node activity, or depletion; the minter and
   stats-writer roles are irrevocable; and SCVs are returned with `transferFrom`, so there's no
   receiver hook.
@@ -201,7 +206,7 @@ Solidity-interface ABI test (it's skipped otherwise).
 ```bash
 mox install        # snekmate into lib/pypi (already vendored)
 mox compile
-mox test           # 191 tests: unit, e2e, fuzz (hypothesis), stateful invariants, ABI checks
+mox test           # 196 tests: unit, e2e, fuzz (hypothesis), stateful invariants, ABI checks
 mox test --coverage
 ```
 
@@ -209,7 +214,7 @@ Test layout:
 
 | File | Covers |
 |---|---|
-| `tests/test_scv.py` | buy paths (exact and insufficient allowance, slippage, caps, fee-on-transfer, no-return and `false`-return tokens, burn mode), reveal window, EIP-2935 path, expired-hash baseline, malicious contract buyer, admin |
+| `tests/test_scv.py` | buy paths (exact and insufficient allowance, slippage, caps, fee-on-transfer, no-return and `false`-return tokens, burn mode), reveal window and 256-block boundary, EIP-2935 ignored, expired-hash baseline, malicious contract buyer, admin |
 | `tests/test_planets.py` | soulbound paths, ERC-5192, `supportsInterface`, node registry |
 | `tests/test_resource_token.py` | minter lock-down, burns |
 | `tests/test_metadata.py` | exact `web3://` strings and refresh events for all collections |
@@ -221,21 +226,22 @@ Test layout:
 | `tests/test_solidity_interface.py` | `ISpacemine.sol` selectors, struct layouts, and events vs. Vyper ABIs |
 | `tests/test_permit.py`, `tests/test_deploy.py` | EIP-712 permits; deploy-script wiring and demo seed |
 
-Mocks live in `tests/mocks/` and never ship: `MockCredits`, `MockFeeCredits`, `MockNoReturnCredits`,
-`MockReceiver` (accept/reject/reenter/wrong-magic), `MockCaller` (contract without receiver hooks), and
-`MockGambler` (tries to keep only good rolls).
+Mocks live in `tests/mocks/` and never ship: `mock_credits`, `mock_fee_credits`, `mock_no_return_credits`,
+`mock_receiver` (accept/reject/reenter/wrong-magic), `mock_caller` (contract without receiver hooks), and
+`mock_gambler` (tries to keep only good rolls).
 
 ## Deploying
 
 ```bash
 mox run deploy                                  # local pyevm: mock CREDITS + demo seed
 mox run deploy --network anvil                  # local node
-mox run deploy --network spacemine-target       # TODO_CHAIN_ID: fill in moccasin.toml first
+mox run deploy --network robinhood-testnet      # Robinhood Chain testnet (chain ID 46630)
+mox run deploy --network robinhood              # mainnet: TODO in moccasin.toml (RPC + chain ID)
 ```
 
 `script/deploy.py`:
 
-1. Uses `CREDITS_ADDRESS` (required on live networks) or deploys `MockCredits` locally.
+1. Uses `CREDITS_ADDRESS` (required on live networks) or deploys `mock_credits` locally.
 2. Deploys Planets, SCV, MNRL, GAS, Mining, and Spaceships.
 3. Wires roles: `MNRL.set_mining`, `GAS.set_mining`, `SCV.set_mining`, `Planets.set_mining`. The
    deployer never holds the resource minter role.

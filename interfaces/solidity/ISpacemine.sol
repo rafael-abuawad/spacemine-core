@@ -8,6 +8,8 @@ pragma solidity ^0.8.20;
 ///         `tests/test_solidity_interface.py` checks every selector, return layout, and event
 ///         here against the compiled Vyper ABIs.
 /// @dev Field names are kept in snake_case so they match the Vyper ABI one-to-one.
+///      Vyper `flag` values are ABI-encoded as `uint256` bitmasks where member `n` has the
+///      value `2**n`; exactly one bit is set for every flag field below (0 = unset).
 
 /// @notice ERC-7572 contract-level metadata, exposed by SCV, Planets, and Spaceships.
 interface ISpacemineContractMetadata {
@@ -22,14 +24,14 @@ interface ISpacemineContractMetadata {
     function metadata_suffix() external view returns (string memory);
 }
 
-/// @notice ERC-721 SCV mining bots (`src/SCV.vy`).
+/// @notice ERC-721 SCV mining bots (`src/scv.vy`).
 interface ISCV is ISpacemineContractMetadata {
-    /// @param model Rarity tier: 0 Standard, 1 Advanced, 2 Elite, 3 Prototype.
+    /// @param model `Tier` flag: 1 Standard, 2 Advanced, 4 Elite, 8 Prototype (0 = unrevealed).
     /// @param seed  keccak256(blockhash(reveal_block), tokenId, scv); zero for baseline reveals.
     struct SCVProperties {
         bytes32 seed;
         bool revealed;
-        uint8 model;
+        uint256 model;
         uint16 mining_power;
         uint16 mineral_efficiency_bps;
         uint16 gas_efficiency_bps;
@@ -45,8 +47,8 @@ interface ISCV is ISpacemineContractMetadata {
     function properties(uint256 tokenId) external view returns (SCVProperties memory);
     function is_revealed(uint256 tokenId) external view returns (bool);
     function reveal_block(uint256 tokenId) external view returns (uint256);
-    /// @param kind 0 = mineral, 1 = gas. Reverts if the token is not revealed.
-    function mining_weight(uint256 tokenId, uint8 kind) external view returns (uint256);
+    /// @param kind `ResourceKind` flag: 1 = mineral, 2 = gas. Reverts if the token is not revealed.
+    function mining_weight(uint256 tokenId, uint256 kind) external view returns (uint256);
     function lifetime_minerals(uint256 tokenId) external view returns (uint256);
     function lifetime_gas(uint256 tokenId) external view returns (uint256);
     function ownerOf(uint256 tokenId) external view returns (address);
@@ -58,13 +60,13 @@ interface ISCV is ISpacemineContractMetadata {
     function symbol() external view returns (string memory);
 }
 
-/// @notice Soulbound ERC-721 planets (`src/Planets.vy`).
+/// @notice Soulbound ERC-721 planets (`src/planets.vy`).
 interface IPlanets is ISpacemineContractMetadata {
-    /// @param biome 0 Terran, 1 Desert, 2 Ice, 3 Volcanic, 4 Ash, 5 Jungle.
+    /// @param biome `Biome` flag: 1 Terran, 2 Desert, 4 Ice, 8 Volcanic, 16 Ash, 32 Jungle.
     struct Planet {
         string name;
         bytes32 seed;
-        uint8 biome;
+        uint256 biome;
         uint8 size;
         int32 coord_x;
         int32 coord_y;
@@ -87,13 +89,13 @@ interface IPlanets is ISpacemineContractMetadata {
     function tokenURI(uint256 tokenId) external view returns (string memory);
 }
 
-/// @notice Resource nodes and staking (`src/Mining.vy`).
+/// @notice Resource nodes and staking (`src/mining.vy`).
 interface IMining {
-    /// @param kind 0 = mineral patch, 1 = gas geyser.
+    /// @param kind `ResourceKind` flag: 1 = mineral patch, 2 = gas geyser.
     /// @dev `node()` returns the node projected to `block.timestamp`.
     struct Node {
         uint256 planet_id;
-        uint8 kind;
+        uint256 kind;
         uint8 max_slots;
         uint8 occupied;
         uint256 reserve_total;
@@ -131,13 +133,13 @@ interface IMining {
     function paid_out(uint256 nodeId) external view returns (uint256);
 }
 
-/// @notice ERC-1155 ship types (`src/Spaceships.vy`).
+/// @notice ERC-1155 ship types (`src/spaceships.vy`).
 interface ISpaceships is ISpacemineContractMetadata {
-    /// @param ship_class 0 Fighter, 1 Frigate, 2 Freighter, 3 Cruiser, 4 Carrier.
+    /// @param ship_class `ShipClass` flag: 1 Fighter, 2 Frigate, 4 Freighter, 8 Cruiser, 16 Carrier.
     /// @param max_supply 0 = unlimited.
     struct ShipType {
         string name;
-        uint8 ship_class;
+        uint256 ship_class;
         uint256 mineral_cost;
         uint256 gas_cost;
         uint256 max_supply;
