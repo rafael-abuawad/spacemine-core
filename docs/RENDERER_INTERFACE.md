@@ -1,7 +1,7 @@
 # Spacemine renderer interface
 
 This document is the contract between the Spacemine Vyper contracts (this repository) and the
-**web3:// (ERC-4804) renderer**, which is built in a separate Solidity repository. The renderer
+**web3:// (ERC-4804) renderer** in [`spacemine-renderer`](https://github.com/rafael-abuawad/spacemine-renderer). The renderer
 builds JSON and SVG metadata **using only view calls**. The Vyper contracts store and concatenate
 URI strings; they never parse them.
 
@@ -35,9 +35,10 @@ Notes:
 - `tokenURI`/`uri` revert for tokens or ship types that don't exist
   (`erc721: invalid token ID`, `spaceships: unknown ship type`).
 - IDs are 1-based and sequential in every collection (SCV, planet, node, ship type).
-- In ERC-4804 terms the renderer is expected to use auto-mode or a manual resolver that
-  routes `/scv/<id>`, `/planets/<id>`, `/ships/<id>` and `/<collection>/contract`. The Vyper
-  contracts don't care: the owner can switch the base or suffix at any time
+- The renderer uses ERC-6944 resolve mode `5219` (ERC-5219 `request`). Auto mode cannot
+  serve both `/scv/7` and `/scv/contract`: a non-numeric segment is treated as a domain name.
+  Raw manual mode does not ABI-decode the path. The Vyper contracts don't care which mode
+  is used: the owner can switch the base or suffix at any time
   (`set_metadata_uri`, `set_contract_uri`).
 
 ## 2. View calls by collection

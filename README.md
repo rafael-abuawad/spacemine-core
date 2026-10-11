@@ -5,8 +5,8 @@ On-chain mining game contracts in **Vyper 0.4.3**, built on [snekmate](https://g
 
 Players buy **SCV** mining bots with **CREDITS** (a third-party launchpad ERC-20), stake them into
 **resource nodes** on **planets**, mine **MNRL** (minerals) and **GAS**, and spend those resources on
-**spaceships**. All NFT metadata is served by an external `web3://` renderer
-([renderer interface](docs/RENDERER_INTERFACE.md)).
+**spaceships**. All NFT metadata is served by the [`web3://` renderer](https://github.com/rafael-abuawad/spacemine-renderer)
+([interface](docs/RENDERER_INTERFACE.md)).
 
 ## Architecture
 
@@ -14,7 +14,7 @@ Players buy **SCV** mining bots with **CREDITS** (a third-party launchpad ERC-20
 flowchart LR
     subgraph external[External]
         CREDITS[(CREDITS ERC-20<br/>launchpad, untrusted)]
-        R[web3:// renderer<br/>separate Solidity repo]
+        R[web3:// renderer<br/>Solidity, view calls only]
     end
 
     Player((Player))
