@@ -15,12 +15,14 @@ Configuration (environment variables, all optional unless noted):
     SCV_BASE_URI / PLANETS_BASE_URI / SHIPS_BASE_URI           override token-URI prefixes
     SCV_CONTRACT_URI / PLANETS_CONTRACT_URI / SHIPS_CONTRACT_URI  override contract URIs
     ROYALTY_BPS           default ERC-2981 royalty for SCV and Spaceships (default: 500)
-    SEED_DEMO             "0" to skip the local demo seed
+    SEED_DEMO             "1"/"0" to force or skip the demo seed (default: local networks only)
+    SEED_FILE             demo universe JSON (default: script/demo_seed.json)
 """
 
 import json
 import os
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 
 import boa
@@ -35,12 +37,13 @@ from src import spaceships as Spaceships
 
 ROOT = Path(__file__).resolve().parent.parent
 MOCKS = ROOT / "tests" / "mocks"
+DEMO_SEED = ROOT / "script" / "demo_seed.json"
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
 # Vyper `flag` values (member `n` encodes as `2**n`).
-KIND_MINERAL, KIND_GAS = 1, 2
-BIOME_ASH = 16
-SHIP_FIGHTER, SHIP_FRIGATE, SHIP_CRUISER = 1, 2, 8
+KINDS = {"MINERAL": 1, "GAS": 2}
+BIOMES = {"TERRAN": 1, "DESERT": 2, "ICE": 4, "VOLCANIC": 8, "ASH": 16, "JUNGLE": 32}
+SHIP_CLASSES = {"FIGHTER": 1, "FRIGATE": 2, "FREIGHTER": 4, "CRUISER": 8, "CARRIER": 16}
 E18 = 10**18
 
 
@@ -172,9 +175,9 @@ def deploy(
         scv.set_default_royalty(treasury, royalty_bps)
         spaceships.set_default_royalty(treasury, royalty_bps)
 
-    # 5. Local demo seed.
+    # 5. Demo seed (local networks by default; SEED_DEMO=1 forces it on live ones).
     if seed_demo is None:
-        seed_demo = local and _env("SEED_DEMO", "1") == "1"
+        seed_demo = _env("SEED_DEMO", "1" if local else "0") == "1"
     if seed_demo:
         seed_demo_content(planets, mining, spaceships)
 
@@ -185,17 +188,46 @@ def deploy(
     return deployment
 
 
-def seed_demo_content(planets: VyperContract, mining: VyperContract, spaceships: VyperContract) -> None:
-    """One planet with 2 mineral patches and 1 geyser, plus 3 ship types."""
-    planet_id = planets.create_planet("Char", BIOME_ASH, 6, 120, -45, 12_000, 8_000)
-    mining.create_node(planet_id, KIND_MINERAL, 3, 1_500_000 * E18, E18)
-    mining.create_node(planet_id, KIND_MINERAL, 3, 1_500_000 * E18, E18)
-    mining.create_node(planet_id, KIND_GAS, 3, 1_000_000 * E18, E18 // 2)
+def _wei(tokens: str) -> int:
+    """Whole-token decimal string (e.g. "0.5") to 18-decimal base units."""
+    return int(Decimal(tokens) * E18)
 
-    # name, class, mineral_cost, gas_cost, max_supply, hull, shield, attack, speed, cargo
-    spaceships.create_ship_type("Viper", SHIP_FIGHTER, 500 * E18, 0, 0, 100, 20, 35, 90, 10)
-    spaceships.create_ship_type("Valkyrie", SHIP_FRIGATE, 1_500 * E18, 750 * E18, 5_000, 300, 120, 60, 60, 200)
-    spaceships.create_ship_type("Behemoth", SHIP_CRUISER, 2_000 * E18, 6_000 * E18, 500, 900, 400, 250, 25, 800)
+
+def load_seed(path: Path | str | None = None) -> dict:
+    return json.loads(Path(path or _env("SEED_FILE", str(DEMO_SEED))).read_text())
+
+
+def seed_demo_content(
+    planets: VyperContract, mining: VyperContract, spaceships: VyperContract, seed: dict | None = None
+) -> None:
+    """Create the planets, resource nodes, and ship types from the demo seed file."""
+    seed = seed or load_seed()
+    for world in seed["planets"]:
+        planet_id = planets.create_planet(
+            world["name"],
+            BIOMES[world["biome"]],
+            world["size"],
+            world["coord_x"],
+            world["coord_y"],
+            world["mineral_richness_bps"],
+            world["gas_richness_bps"],
+        )
+        for node in world["nodes"]:
+            mining.create_node(planet_id, KINDS[node["kind"]], node["slots"], _wei(node["base_reserve"]), _wei(node["rate"]))
+
+    for ship in seed["ships"]:
+        spaceships.create_ship_type(
+            ship["name"],
+            SHIP_CLASSES[ship["class"]],
+            _wei(ship["mineral_cost"]),
+            _wei(ship["gas_cost"]),
+            ship["max_supply"],
+            ship["hull"],
+            ship["shield"],
+            ship["attack"],
+            ship["speed"],
+            ship["cargo"],
+        )
 
 
 def moccasin_main() -> Spacemine:

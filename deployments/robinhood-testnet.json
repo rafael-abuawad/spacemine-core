@@ -1,0 +1,16 @@
+{
+  "network": "robinhood-testnet",
+  "chainId": "46630",
+  "deployedAt": "2026-10-12T13:06:50Z",
+  "deployer": "0xC14fF56E720f79d08413CE00533256433D2ED929",
+  "treasury": "0x92C840AEA86c8C3fa39989eaD6801Ae1046Dacf4",
+  "credits": "0x455211d1b760d9b25a794fb788ad3adce36afc6c",
+  "faucetCredits": "1",
+  "scv": "0x52e17f6c5aa94823cbbca4270745545676901ad7",
+  "planets": "0xa8f5ca2502eae9bd07f7e0945de9fcc41970c56c",
+  "minerals": "0x244addf22c4500c55ab4f5ee18506a953b2b8a90",
+  "gas": "0xa0ac4fc6ed42a5d1aba1a8fe1c5b66168a29b33e",
+  "mining": "0x0d3508a5beb6dbf4c67282c38fb08674ae2d1280",
+  "spaceships": "0x4e09e94c82e3ba35ecfe8fa231fcff7d9df94984",
+  "renderer": "0x30086Aa227878700a0b5A8991c66BA2d537B18Aa"
+}

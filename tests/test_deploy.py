@@ -3,7 +3,7 @@
 import pytest
 
 import script.deploy as deploy_script
-from helpers import DEAD_ADDRESS, E18, KIND_GAS, KIND_MINERAL, load_mock
+from helpers import DEAD_ADDRESS, E18, load_mock
 
 
 def test_wiring(world, deployer):
@@ -24,18 +24,47 @@ def test_wiring(world, deployer):
 
 
 def test_demo_seed():
+    seed = deploy_script.load_seed()
     d = deploy_script.deploy(seed_demo=True)
-    assert d.planets.planet_count() == 1
-    assert d.planets.nodes_of(1) == [1, 2, 3]
-    kinds = [d.mining.node(i).kind for i in (1, 2, 3)]
-    assert kinds == [KIND_MINERAL, KIND_MINERAL, KIND_GAS]
-    assert d.spaceships.ship_type_count() == 3
-    fighter, frigate, cruiser = (d.spaceships.ship_type(i) for i in (1, 2, 3))
-    assert (fighter.mineral_cost > 0, fighter.gas_cost) == (True, 0)
-    assert frigate.mineral_cost > 0 and frigate.gas_cost > 0
-    assert cruiser.gas_cost > cruiser.mineral_cost
-    assert d.planets.planet(1).mineral_richness_bps == 12_000
-    assert d.mining.node(1).reserve_total == 1_800_000 * E18
+    assert d.planets.planet_count() == len(seed["planets"]) >= 6
+    assert {d.planets.planet(i + 1).biome for i in range(len(seed["planets"]))} == set(deploy_script.BIOMES.values())
+
+    node_id = 0
+    for index, world in enumerate(seed["planets"]):
+        planet_id = index + 1
+        planet = d.planets.planet(planet_id)
+        assert (planet.name, planet.mineral_richness_bps) == (world["name"], world["mineral_richness_bps"])
+        kinds = [node["kind"] for node in world["nodes"]]
+        # Every world has several mineral patches and at least one geyser.
+        assert kinds.count("MINERAL") >= 2 and kinds.count("GAS") >= 1
+        ids = list(range(node_id + 1, node_id + 1 + len(world["nodes"])))
+        assert d.planets.nodes_of(planet_id) == ids
+        for nid, node in zip(ids, world["nodes"]):
+            created = d.mining.node(nid)
+            richness = planet.mineral_richness_bps if node["kind"] == "MINERAL" else planet.gas_richness_bps
+            assert created.kind == deploy_script.KINDS[node["kind"]]
+            assert created.max_slots == node["slots"]
+            assert created.emission_rate == deploy_script._wei(node["rate"])
+            assert created.reserve_total == deploy_script._wei(node["base_reserve"]) * richness // 10_000
+        node_id = ids[-1]
+    assert d.mining.node_count() == node_id
+
+    assert d.spaceships.ship_type_count() == len(seed["ships"])
+    classes = {d.spaceships.ship_type(i + 1).ship_class for i in range(len(seed["ships"]))}
+    assert classes == set(deploy_script.SHIP_CLASSES.values())
+    fighter = d.spaceships.ship_type(1)
+    assert (fighter.mineral_cost, fighter.gas_cost) == (500 * E18, 0)
+    assert d.planets.planet(1).mineral_richness_bps == 11_000
+    assert d.mining.node(1).reserve_total == 3_300_000 * E18
+
+
+def test_live_network_seed_is_opt_in(monkeypatch):
+    monkeypatch.setattr(deploy_script, "_is_local", lambda: False)
+    monkeypatch.setenv("CREDITS_ADDRESS", str(load_mock("mock_credits").address))
+    monkeypatch.delenv("SEED_DEMO", raising=False)
+    assert deploy_script.deploy().planets.planet_count() == 0
+    monkeypatch.setenv("SEED_DEMO", "1")
+    assert deploy_script.deploy().planets.planet_count() == len(deploy_script.load_seed()["planets"])
 
 
 def test_env_configuration(monkeypatch, alice):

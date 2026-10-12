@@ -1,0 +1,109 @@
+{
+  "_comment": "Demo universe used by script/deploy.py and client/scripts/deploy-chain.sh. Token amounts are whole tokens (18 decimals are added on load); rate is tokens per second; base_reserve is scaled by the planet's richness on-chain. Max 8 nodes per planet keeps the mining scene readable (the contract allows 16).",
+  "planets": [
+    {
+      "name": "Veyra Prime",
+      "biome": "TERRAN",
+      "size": 7,
+      "coord_x": -140,
+      "coord_y": 40,
+      "mineral_richness_bps": 11000,
+      "gas_richness_bps": 9000,
+      "nodes": [
+        { "kind": "MINERAL", "slots": 8, "base_reserve": "3000000", "rate": "1" },
+        { "kind": "MINERAL", "slots": 8, "base_reserve": "3000000", "rate": "1" },
+        { "kind": "MINERAL", "slots": 6, "base_reserve": "2000000", "rate": "0.8" },
+        { "kind": "MINERAL", "slots": 6, "base_reserve": "2000000", "rate": "0.8" },
+        { "kind": "GAS", "slots": 6, "base_reserve": "1500000", "rate": "0.5" }
+      ]
+    },
+    {
+      "name": "Ossaru",
+      "biome": "DESERT",
+      "size": 5,
+      "coord_x": 70,
+      "coord_y": 140,
+      "mineral_richness_bps": 14000,
+      "gas_richness_bps": 5000,
+      "nodes": [
+        { "kind": "MINERAL", "slots": 4, "base_reserve": "2500000", "rate": "1.2" },
+        { "kind": "MINERAL", "slots": 4, "base_reserve": "2500000", "rate": "1.2" },
+        { "kind": "MINERAL", "slots": 4, "base_reserve": "2500000", "rate": "1.2" },
+        { "kind": "MINERAL", "slots": 3, "base_reserve": "1500000", "rate": "1.5" },
+        { "kind": "MINERAL", "slots": 3, "base_reserve": "1500000", "rate": "1.5" },
+        { "kind": "GAS", "slots": 3, "base_reserve": "800000", "rate": "0.4" }
+      ]
+    },
+    {
+      "name": "Nivara",
+      "biome": "ICE",
+      "size": 4,
+      "coord_x": 190,
+      "coord_y": -30,
+      "mineral_richness_bps": 7000,
+      "gas_richness_bps": 18000,
+      "nodes": [
+        { "kind": "GAS", "slots": 4, "base_reserve": "2000000", "rate": "1" },
+        { "kind": "MINERAL", "slots": 4, "base_reserve": "2000000", "rate": "0.6" },
+        { "kind": "MINERAL", "slots": 4, "base_reserve": "2000000", "rate": "0.6" },
+        { "kind": "GAS", "slots": 4, "base_reserve": "2000000", "rate": "1" }
+      ]
+    },
+    {
+      "name": "Pyrrhos",
+      "biome": "VOLCANIC",
+      "size": 8,
+      "coord_x": 40,
+      "coord_y": -160,
+      "mineral_richness_bps": 22000,
+      "gas_richness_bps": 14000,
+      "nodes": [
+        { "kind": "GAS", "slots": 2, "base_reserve": "1500000", "rate": "2" },
+        { "kind": "MINERAL", "slots": 2, "base_reserve": "2000000", "rate": "3" },
+        { "kind": "MINERAL", "slots": 2, "base_reserve": "2000000", "rate": "3" },
+        { "kind": "MINERAL", "slots": 2, "base_reserve": "2000000", "rate": "3" },
+        { "kind": "MINERAL", "slots": 2, "base_reserve": "2000000", "rate": "3" },
+        { "kind": "GAS", "slots": 2, "base_reserve": "1500000", "rate": "2" }
+      ]
+    },
+    {
+      "name": "Cindral",
+      "biome": "ASH",
+      "size": 6,
+      "coord_x": -50,
+      "coord_y": -70,
+      "mineral_richness_bps": 9000,
+      "gas_richness_bps": 6000,
+      "nodes": [
+        { "kind": "MINERAL", "slots": 4, "base_reserve": "2000000", "rate": "1" },
+        { "kind": "MINERAL", "slots": 4, "base_reserve": "2000000", "rate": "1" },
+        { "kind": "MINERAL", "slots": 3, "base_reserve": "120000", "rate": "2" },
+        { "kind": "GAS", "slots": 3, "base_reserve": "1000000", "rate": "0.5" }
+      ]
+    },
+    {
+      "name": "Myrrowen",
+      "biome": "JUNGLE",
+      "size": 9,
+      "coord_x": -180,
+      "coord_y": -140,
+      "mineral_richness_bps": 12000,
+      "gas_richness_bps": 12000,
+      "nodes": [
+        { "kind": "GAS", "slots": 4, "base_reserve": "2000000", "rate": "0.8" },
+        { "kind": "MINERAL", "slots": 6, "base_reserve": "3000000", "rate": "1.2" },
+        { "kind": "MINERAL", "slots": 6, "base_reserve": "3000000", "rate": "1.2" },
+        { "kind": "MINERAL", "slots": 6, "base_reserve": "3000000", "rate": "1.2" },
+        { "kind": "MINERAL", "slots": 6, "base_reserve": "3000000", "rate": "1.2" },
+        { "kind": "GAS", "slots": 4, "base_reserve": "2000000", "rate": "0.8" }
+      ]
+    }
+  ],
+  "ships": [
+    { "name": "Viper", "class": "FIGHTER", "mineral_cost": "500", "gas_cost": "0", "max_supply": 0, "hull": 100, "shield": 20, "attack": 35, "speed": 90, "cargo": 10 },
+    { "name": "Valkyrie", "class": "FRIGATE", "mineral_cost": "1500", "gas_cost": "750", "max_supply": 5000, "hull": 300, "shield": 120, "attack": 60, "speed": 60, "cargo": 200 },
+    { "name": "Hauler", "class": "FREIGHTER", "mineral_cost": "1200", "gas_cost": "300", "max_supply": 0, "hull": 450, "shield": 80, "attack": 10, "speed": 40, "cargo": 1500 },
+    { "name": "Behemoth", "class": "CRUISER", "mineral_cost": "2000", "gas_cost": "6000", "max_supply": 500, "hull": 900, "shield": 400, "attack": 250, "speed": 25, "cargo": 800 },
+    { "name": "Sovereign", "class": "CARRIER", "mineral_cost": "6000", "gas_cost": "4000", "max_supply": 100, "hull": 1200, "shield": 600, "attack": 180, "speed": 20, "cargo": 1200 }
+  ]
+}

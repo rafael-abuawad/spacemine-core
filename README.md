@@ -247,8 +247,31 @@ mox run deploy --network robinhood              # mainnet: TODO in moccasin.toml
    deployer never holds the resource minter role.
 4. Sets metadata and contract URIs (`RENDERER_ADDRESS`, `METADATA_SUFFIX`, `*_BASE_URI`,
    `*_CONTRACT_URI`) and the default royalty (`ROYALTY_BPS`).
-5. On local networks (unless `SEED_DEMO=0`), creates one planet with 2 mineral patches and 1 geyser,
-   plus 3 ship types: a mineral-only fighter, a mixed-cost frigate, and a gas-heavy cruiser.
+5. On local networks (unless `SEED_DEMO=0`, or on live ones with `SEED_DEMO=1`), seeds the demo universe
+   from [`script/demo_seed.json`](script/demo_seed.json): six planets (one per biome), each with several
+   mineral patches and one or two gas geysers (31 nodes), plus five ship types, one per class.
+
+### Robinhood Chain testnet (demo)
+
+moccasin's boa network env mis-executes calls on anvil, so live deploys go through the `cast`/`forge`
+script in the client, which deploys core plus the renderer, seeds the same `demo_seed.json`, opens the
+SCV sale, writes `client/.env.robinhood-testnet.local`, and records addresses in
+`deployments/robinhood-testnet.json`:
+
+```bash
+cd ../client
+PRIVATE_KEY=0x... RPC_URL=<provider url> TREASURY_ADDRESS=0x... pnpm deploy:testnet
+pnpm dev:testnet        # or: pnpm build:testnet
+```
+
+Without `CREDITS_ADDRESS`, it deploys **Space Credits** (`src/faucet_credits.vy`, testnet only): an ERC-20 with
+a public `claim()` that mints `FAUCET_CLAIM_AMOUNT` (default 10,000) once per `FAUCET_COOLDOWN` (default 24h)
+per address. The client shows a "Claim CREDITS" button in the Funds panel when the token has a faucet. The
+owner can retune or close it with `set_claim(amount, cooldown)` (amount 0 closes it) and can still `mint`;
+addresses in `MINT_CREDITS_TO` (default: the deployer) get 10,000 up front. The faucet is farmable with
+fresh addresses, so never use it on mainnet. The treasury must differ from any wallet that buys
+SCVs, because `buy` checks that the treasury's balance grows. See the header of
+`client/scripts/deploy-chain.sh` for every option.
 
 Other variables: `TREASURY_ADDRESS`, `SCV_BURN_PROCEEDS=1`, `SCV_PRICE`, `SCV_MAX_SUPPLY`. The sale
 starts closed; open it with `scv.set_sale_active(True)`.
